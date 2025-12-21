@@ -184,6 +184,7 @@ def main():
         disable_bg_music=args.disable_bg_music,
         bg_music_volume=args.bg_music_volume,
         bg_music_path=args.bg_music_path,
+        disable_bg_video=args.disable_bg_video,
         bg_video_path=args.bg_video_path,
         disable_score=args.disable_score,
         limit_user_songs_by=args.limit_user_songs_by,
