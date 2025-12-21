@@ -121,6 +121,7 @@ def parse_pikaraoke_args():
     parser.add_argument(
         "--hide-url",
         action="store_true",
+        default=None,
         help="Hide URL and QR code from the splash screen.",
         required=False,
     )
@@ -134,12 +135,14 @@ def parse_pikaraoke_args():
     parser.add_argument(
         "--hide-overlay",
         action="store_true",
+        default=None,
         help="Hide all overlays that show on top of video, including current/next song, pikaraoke QR code and IP",
         required=False,
     ),
     parser.add_argument(
         "--hide-notifications",
         action="store_true",
+        default=None,
         help="Hide notifications from the splash screen.",
         required=False,
     )
@@ -153,6 +156,7 @@ def parse_pikaraoke_args():
     parser.add_argument(
         "--high-quality",
         action="store_true",
+        default=None,
         help="Download higher quality video. May cause CPU, download speed, and other performance issues",
         required=False,
     )
@@ -160,6 +164,7 @@ def parse_pikaraoke_args():
         "-c",
         "--complete-transcode-before-play",
         action="store_true",
+        default=None,
         help="Wait for ffmpeg video transcoding to fully complete before playback begins. Transcoding occurs when you have normalization on, play a cdg file, or change key. May improve performance and browser compatibility (Safari, Firefox), but will significantly increase the delay before playback begins. On modern hardware, the delay is likely negligible.",
         required=False,
     )
@@ -200,6 +205,7 @@ def parse_pikaraoke_args():
     parser.add_argument(
         "--disable-bg-music",
         action="store_true",
+        default=None,
         help="Disable background music on splash screen",
         required=False,
     ),
@@ -227,6 +233,7 @@ def parse_pikaraoke_args():
     parser.add_argument(
         "--disable-bg-video",
         action="store_true",
+        default=None,
         help="Disable background video on splash screen",
         required=False,
     ),
@@ -234,6 +241,7 @@ def parse_pikaraoke_args():
         "--disable-score",
         help="Disable the score screen after each song",
         action="store_true",
+        default=None,
         required=False,
     ),
     parser.add_argument(
@@ -258,6 +266,7 @@ def parse_pikaraoke_args():
         "--cdg-pixel-scaling",
         help="Enable CDG pixel scaling to improve video rendering of CDG files. This may increase CPU usage and may cause performance issues on slower devices.",
         action="store_true",
+        default=None,
         required=False,
     ),
 

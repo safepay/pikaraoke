@@ -130,42 +130,38 @@ class Karaoke:
         # Initialize variables
         self.config_file_path = config_file_path
         self.port = port
-        self.hide_url = self.get_user_preference("hide_url") or hide_url
-        self.hide_notifications = (
-            self.get_user_preference("hide_notifications") or hide_notifications
-        )
+
+        # Helper to prioritize CLI args over config: CLI arg > Config > Default
+        def get_pref(pref_name, cli_value, default):
+            return cli_value if cli_value is not None else self.get_user_preference(pref_name, default)
+
+        self.hide_url = get_pref("hide_url", hide_url, False)
+        self.hide_notifications = get_pref("hide_notifications", hide_notifications, False)
         self.hide_splash_screen = hide_splash_screen
         self.download_path = download_path
-        self.high_quality = self.get_user_preference("high_quality") or high_quality
-        self.splash_delay = self.get_user_preference("splash_delay") or int(splash_delay)
-        self.volume = self.get_user_preference("volume") or volume
-        self.normalize_audio = self.get_user_preference("normalize_audio") or normalize_audio
-        self.complete_transcode_before_play = (
-            self.get_user_preference("complete_transcode_before_play")
-            or complete_transcode_before_play
-        )
+        self.high_quality = get_pref("high_quality", high_quality, False)
+        self.splash_delay = get_pref("splash_delay", splash_delay, 5)
+        self.volume = get_pref("volume", volume, 0.85)
+        self.normalize_audio = get_pref("normalize_audio", normalize_audio, False)
+        self.complete_transcode_before_play = get_pref("complete_transcode_before_play", complete_transcode_before_play, False)
         self.log_level = log_level
-        self.buffer_size = self.get_user_preference("buffer_size") or buffer_size
+        self.buffer_size = get_pref("buffer_size", buffer_size, 256)
         self.youtubedl_path = youtubedl_path
         self.youtubedl_proxy = youtubedl_proxy
         self.additional_ytdl_args = additional_ytdl_args
         self.logo_path = self.default_logo_path if logo_path == None else logo_path
-        self.hide_overlay = self.get_user_preference("hide_overlay") or hide_overlay
-        self.screensaver_timeout = (
-            self.get_user_preference("screensaver_timeout") or screensaver_timeout
-        )
+        self.hide_overlay = get_pref("hide_overlay", hide_overlay, False)
+        self.screensaver_timeout = get_pref("screensaver_timeout", screensaver_timeout, 300)
         self.prefer_hostname = prefer_hostname
-        self.disable_bg_music = self.get_user_preference("disable_bg_music") or disable_bg_music
-        self.bg_music_volume = self.get_user_preference("bg_music_volume") or bg_music_volume
+        self.disable_bg_music = get_pref("disable_bg_music", disable_bg_music, False)
+        self.bg_music_volume = get_pref("bg_music_volume", bg_music_volume, 0.3)
         self.bg_music_path = self.default_bg_music_path if bg_music_path == None else bg_music_path
-        self.disable_bg_video = self.get_user_preference("disable_bg_video") or disable_bg_video
+        self.disable_bg_video = get_pref("disable_bg_video", disable_bg_video, False)
         self.bg_video_path = self.default_bg_video_path if bg_video_path == None else bg_video_path
-        self.disable_score = self.get_user_preference("disable_score") or disable_score
-        self.limit_user_songs_by = (
-            self.get_user_preference("limit_user_songs_by") or limit_user_songs_by
-        )
-        self.cdg_pixel_scaling = self.get_user_preference("cdg_pixel_scaling") or cdg_pixel_scaling
-        self.avsync = self.get_user_preference("avsync") or avsync
+        self.disable_score = get_pref("disable_score", disable_score, False)
+        self.limit_user_songs_by = get_pref("limit_user_songs_by", limit_user_songs_by, 0)
+        self.cdg_pixel_scaling = get_pref("cdg_pixel_scaling", cdg_pixel_scaling, False)
+        self.avsync = get_pref("avsync", avsync, 0)
         self.url_override = url
         self.url = self.get_url()
 
@@ -212,32 +208,51 @@ class Karaoke:
         logging.debug("\n\n" + output)
 
     # def get_user_preferences(self, preference):
-    def get_user_preference(self, preference, default_value=False):
-        # Try to read the config file
-        try:
-            self.config_obj.read(self.config_file_path)
-        except FileNotFoundError:
-            return default_value
+    def get_user_preference(self, preference, default_value=None):
+        """Get a user preference from config.ini. Returns the preference value,
+        or default_value if not found"""
 
-        # Check if the section exists
-        if not self.config_obj.has_section("USERPREFERENCES"):
-            return default_value
-
-        # Try to get the value
         try:
-            pref = self.config_obj.get("USERPREFERENCES", preference)
-            if pref == "True":
-                return True
-            elif pref == "False":
-                return False
-            elif pref.isnumeric():
-                return int(pref)
-            elif pref.replace(".", "", 1).isdigit():
-                return float(pref)
-            else:
+            # Read the config file from disk
+            try:
+                self.config_obj.read(self.config_file_path)
+            except FileNotFoundError:
+                return default_value
+
+            # Check if USERPREFERENCES section exists first
+            if "USERPREFERENCES" not in self.config_obj:
+                return default_value
+
+            # Check if the specific preference exists
+            if preference not in self.config_obj["USERPREFERENCES"]:
+                return default_value
+
+            pref = self.config_obj["USERPREFERENCES"][preference]
+
+            # Only convert if it's a string
+            if not isinstance(pref, str):
                 return pref
 
-        except (configparser.NoOptionError, ValueError):
+            # Convert string boolean values to actual booleans
+            if pref.lower() == "true":
+                return True
+            elif pref.lower() == "false":
+                return False
+
+            # Try to convert to number if it looks like one
+            if pref.replace(".", "", 1).replace("-", "", 1).isdigit():
+                try:
+                    if "." in pref:
+                        return float(pref)
+                    else:
+                        return int(pref)
+                except ValueError:
+                    pass  # Keep as string if conversion fails
+
+            # Return as string
+            return pref
+
+        except (configparser.NoOptionError, ValueError, AttributeError, KeyError):
             return default_value
 
     def change_preferences(self, preference, val):
@@ -251,7 +266,28 @@ class Karaoke:
 
             userprefs = self.config_obj["USERPREFERENCES"]
             userprefs[preference] = str(val)
-            setattr(self, preference, val)
+
+            # Convert string values to proper types
+            converted_val = val
+            if isinstance(val, str) and hasattr(self, preference):
+                current_val = getattr(self, preference)
+                if current_val is not None:
+                    current_type = type(current_val)
+
+                    if current_type == bool:
+                        converted_val = val.lower() == "true"
+                    elif current_type in (int, float):
+                        try:
+                            converted_val = current_type(val)
+                        except ValueError:
+                            pass  # Keep as string if conversion fails
+
+            setattr(self, preference, converted_val)
+
+            # Update cache for preferred_language if that's what changed
+            if preference == "preferred_language":
+                self._cached_preferred_language = converted_val
+
             with open(self.config_file_path, "w") as conf:
                 self.config_obj.write(conf)
                 self.changed_preferences = True
