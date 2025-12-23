@@ -604,7 +604,8 @@ class Karaoke:
                             if output_file_size > 0:
                                 with open(fr.output_file, 'r') as f:
                                     playlist_content = f.read()
-                                    segment_count = playlist_content.count('.m4s')
+                                    # Count both fMP4 (.m4s) and MPEG-TS (.ts) segments
+                                    segment_count = playlist_content.count('.m4s') + playlist_content.count('.ts')
                                     is_buffering_complete = segment_count >= 2
                             if is_buffering_complete:
                                 logging.debug(f"Buffering complete. Playlist size: {output_file_size}, Segments: {segment_count}")

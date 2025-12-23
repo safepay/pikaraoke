@@ -72,7 +72,15 @@ class FileResolver:
         else:  # hls
             self.output_file = f"{self.tmp_dir}/{self.stream_uid}.m3u8"
 
-        self.segment_pattern = f"{self.tmp_dir}/{self.stream_uid}_segment_%03d.m4s"
+        # Determine segment type based on file format
+        # Use MPEG-TS segments for problematic container formats (better Smart TV compatibility)
+        problematic_formats = ['.avi', '.mkv', '.mov', '.flv', '.wmv']
+        if self.file_extension in problematic_formats:
+            self.segment_pattern = f"{self.tmp_dir}/{self.stream_uid}_segment_%03d.ts"
+            self.segment_type = "mpegts"  # MPEG-TS segments
+        else:
+            self.segment_pattern = f"{self.tmp_dir}/{self.stream_uid}_segment_%03d.m4s"
+            self.segment_type = "fmp4"  # Fragmented MP4 segments
 
     # Extract zipped cdg + mp3 files into a temporary directory, and set the paths to both files.
     def handle_zipped_cdg(self, file_path):

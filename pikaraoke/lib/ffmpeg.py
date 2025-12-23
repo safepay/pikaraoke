@@ -75,24 +75,45 @@ def build_ffmpeg_cmd(
                 video_bitrate="500k",
             )
         else:  # hls
-            # HLS with fMP4 segments - fixes audio sync on Smart TVs
-            output = ffmpeg.output(
-                audio,
-                video,
-                fr.output_file,
-                vcodec="libx264",
-                acodec="aac",
-                preset="ultrafast",
-                pix_fmt="yuv420p",
-                f="hls",
-                hls_time=3,
-                hls_list_size=0,
-                hls_segment_type="fmp4",
-                hls_fmp4_init_filename="init.mp4",
-                hls_segment_filename=fr.segment_pattern,
-                video_bitrate="500k",
-                **{"vsync": "cfr"},  # Force constant frame rate for better A/V sync
-            )
+            # HLS with either fMP4 or MPEG-TS segments based on file format
+            if fr.segment_type == "mpegts":
+                # MPEG-TS segments for problematic formats (.avi, .mkv, .mov)
+                # Better Smart TV compatibility and handles VFR/timing issues
+                output = ffmpeg.output(
+                    audio,
+                    video,
+                    fr.output_file,
+                    vcodec="libx264",
+                    acodec="aac",
+                    preset="ultrafast",
+                    pix_fmt="yuv420p",
+                    f="hls",
+                    hls_time=3,
+                    hls_list_size=0,
+                    # No hls_segment_type - defaults to MPEG-TS
+                    hls_segment_filename=fr.segment_pattern,
+                    video_bitrate="500k",
+                    **{"vsync": "cfr"},  # Force constant frame rate for better A/V sync
+                )
+            else:
+                # fMP4 segments for standard formats
+                output = ffmpeg.output(
+                    audio,
+                    video,
+                    fr.output_file,
+                    vcodec="libx264",
+                    acodec="aac",
+                    preset="ultrafast",
+                    pix_fmt="yuv420p",
+                    f="hls",
+                    hls_time=3,
+                    hls_list_size=0,
+                    hls_segment_type="fmp4",
+                    hls_fmp4_init_filename="init.mp4",
+                    hls_segment_filename=fr.segment_pattern,
+                    video_bitrate="500k",
+                    **{"vsync": "cfr"},  # Force constant frame rate for better A/V sync
+                )
     else:
         video = input.video
         # Output format based on streaming_format setting
@@ -110,22 +131,41 @@ def build_ffmpeg_cmd(
                 video_bitrate=vbitrate,
             )
         else:  # hls
-            # HLS with fMP4 segments - fixes audio sync on Smart TVs
-            output = ffmpeg.output(
-                audio,
-                video,
-                fr.output_file,
-                vcodec=vcodec,
-                acodec=acodec,
-                preset="ultrafast",
-                f="hls",
-                hls_time=3,
-                hls_list_size=0,
-                hls_segment_type="fmp4",
-                hls_fmp4_init_filename="init.mp4",
-                hls_segment_filename=fr.segment_pattern,
-                video_bitrate=vbitrate,
-            )
+            # HLS with either fMP4 or MPEG-TS segments based on file format
+            if fr.segment_type == "mpegts":
+                # MPEG-TS segments for problematic formats (.avi, .mkv, .mov)
+                # Better Smart TV compatibility and handles VFR/timing issues
+                output = ffmpeg.output(
+                    audio,
+                    video,
+                    fr.output_file,
+                    vcodec=vcodec,
+                    acodec=acodec,
+                    preset="ultrafast",
+                    f="hls",
+                    hls_time=3,
+                    hls_list_size=0,
+                    # No hls_segment_type - defaults to MPEG-TS
+                    hls_segment_filename=fr.segment_pattern,
+                    video_bitrate=vbitrate,
+                )
+            else:
+                # fMP4 segments for standard formats
+                output = ffmpeg.output(
+                    audio,
+                    video,
+                    fr.output_file,
+                    vcodec=vcodec,
+                    acodec=acodec,
+                    preset="ultrafast",
+                    f="hls",
+                    hls_time=3,
+                    hls_list_size=0,
+                    hls_segment_type="fmp4",
+                    hls_fmp4_init_filename="init.mp4",
+                    hls_segment_filename=fr.segment_pattern,
+                    video_bitrate=vbitrate,
+                )
 
     args = output.get_args()
     logging.debug(f"COMMAND: ffmpeg " + " ".join(args))
