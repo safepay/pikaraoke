@@ -85,6 +85,9 @@ def build_ffmpeg_cmd(
                     fr.output_file,
                     vcodec="libx264",
                     acodec="aac",
+                    audio_bitrate="192k",  # Explicit quality for AAC
+                    ac=2,  # Force stereo (downmix surround sound)
+                    ar=48000,  # Standard sample rate for streaming
                     preset="ultrafast",
                     pix_fmt="yuv420p",
                     f="hls",
@@ -142,6 +145,9 @@ def build_ffmpeg_cmd(
                     fr.output_file,
                     vcodec=vcodec,
                     acodec="aac",  # Force AAC encoding for MPEG-TS (don't use "copy")
+                    audio_bitrate="192k",  # Explicit quality for AAC
+                    ac=2,  # Force stereo (downmix surround sound)
+                    ar=48000,  # Standard sample rate for streaming
                     preset="ultrafast",
                     f="hls",
                     hls_time=3,
