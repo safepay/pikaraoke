@@ -135,12 +135,13 @@ def build_ffmpeg_cmd(
             if fr.segment_type == "mpegts":
                 # MPEG-TS segments for problematic formats (.avi, .mkv, .mov)
                 # Better Smart TV compatibility and handles VFR/timing issues
+                # IMPORTANT: Always re-encode audio to AAC for MPEG-TS compatibility
                 output = ffmpeg.output(
                     audio,
                     video,
                     fr.output_file,
                     vcodec=vcodec,
-                    acodec=acodec,
+                    acodec="aac",  # Force AAC encoding for MPEG-TS (don't use "copy")
                     preset="ultrafast",
                     f="hls",
                     hls_time=3,
