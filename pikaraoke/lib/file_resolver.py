@@ -2,6 +2,7 @@ import os
 import re
 import shutil
 import tempfile
+import time
 import zipfile
 from sys import maxsize
 
@@ -63,7 +64,9 @@ class FileResolver:
         create_tmp_dir()
         self.tmp_dir = get_tmp_dir()
         self.resolved_file_path = self.process_file(file_path)
-        self.stream_uid = string_to_hash(file_path)
+        # Include timestamp to ensure unique stream UIDs for repeated plays
+        unique_string = f"{file_path}_{time.time()}"
+        self.stream_uid = string_to_hash(unique_string)
         self.streaming_format = streaming_format
 
         # Set output file extension based on streaming format
