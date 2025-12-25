@@ -741,10 +741,23 @@ class Karaoke:
                 try:
                     output_file_size = os.path.getsize(fr.output_file)
                     if not self.complete_transcode_before_play:
-                        is_buffering_complete = output_file_size > self.buffer_size * 1000
-                        if is_buffering_complete:
-                            logging.debug(f"Buffering complete. File size: {output_file_size}")
-                            break
+                        if self.streaming_format == "mp4":
+                            # For progressive MP4, check file size
+                            min_buffer_size = 1024 * 1024  # 1MB minimum
+                            if output_file_size >= min_buffer_size:
+                                is_buffering_complete = True
+                                logging.debug(f"Buffering complete. File size: {output_file_size} bytes ({output_file_size / 1024 / 1024:.2f} MB)")
+                                break
+                        else:  # hls
+                            # For HLS, check if playlist has at least 2 segments
+                            if output_file_size > 0:
+                                with open(fr.output_file, 'r') as f:
+                                    playlist_content = f.read()
+                                    segment_count = playlist_content.count('.m4s')
+                                    is_buffering_complete = segment_count >= 2
+                            if is_buffering_complete:
+                                logging.debug(f"Buffering complete. Playlist size: {output_file_size}, Segments: {segment_count}")
+                                break
                 except:
                     pass
                 # Prevent infinite loop if playback never starts
