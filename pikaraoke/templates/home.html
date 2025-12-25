@@ -107,6 +107,7 @@
 
 		$("#pause-resume").click(function () {
 			$.get("/pause");
+			togglePausePlayButton();
 		});
 
 		$("#vol-up").click(function () {
