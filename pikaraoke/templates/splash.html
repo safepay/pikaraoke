@@ -330,6 +330,9 @@
         duration.hide();
       }
 
+      // Stop background music before playing video
+      playBGMusic(false);
+
       video.play();
 
       // handle timeout if video fails to play
