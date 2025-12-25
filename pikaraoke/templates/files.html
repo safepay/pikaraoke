@@ -102,12 +102,14 @@
 		</a>
 		{% endif %}
 	</span>
+	{# Batch song renamer removed - feature not available in this version
 	{% if admin %}
 	<a class="batch-edit-btn" href="{{ url_for('batch_song_renamer.browse')}}" title="Edit all songs"
 		><i class="icon icon-edit"></i>{# MSG: Button to open the batch song renamer page. #} {% trans %}Edit all songs{%
 		endtrans %}</a
 	>
 	{% endif%}
+	#}
 </p>
 
 <div id="alpha-bar" class="column is-full has-background-dark mobile-hide">
