@@ -303,7 +303,18 @@
         );
         endSong("interaction confirmation required");
       }
-      $("#video-source").attr("src", np.now_playing_url);
+
+      // Use HLS streaming - native support on Safari and Smart TVs
+      const streamUrl = np.now_playing_url;
+      console.log('Loading video:', streamUrl);
+      console.log('User Agent:', navigator.userAgent);
+
+      // Clear the source first to prevent browser from caching old HLS playlist
+      $("#video-source").attr("src", "");
+      video.load();
+
+      // Now set the new source
+      $("#video-source").attr("src", streamUrl);
       video.load();
       if (volume != np.volume) {
         volume = np.volume;
