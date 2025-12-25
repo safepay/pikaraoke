@@ -672,13 +672,15 @@ class Karaoke:
             self.queue.pop(0)
             return False
 
-        if self.complete_transcode_before_play or not requires_transcoding:
-            # This route is used for streaming the full video file, and includes more
-            # accurate headers for safari and other browsers
+        # Set stream URL based on format
+        if self.streaming_format == "mp4":
+            stream_url_path = f"/stream/{fr.stream_uid}.mp4"
+        else:  # hls
+            stream_url_path = f"/stream/{fr.stream_uid}.m3u8"
+
+        # For non-transcoded files, still use direct MP4 serving
+        if not requires_transcoding:
             stream_url_path = f"/stream/full/{fr.stream_uid}"
-        else:
-            # This route is used for streaming the video file in chunks, only works on chrome
-            stream_url_path = f"/stream/{fr.stream_uid}"
 
         if not requires_transcoding:
             # simply copy file path to the tmp directory and the stream is ready
