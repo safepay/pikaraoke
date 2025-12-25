@@ -90,6 +90,9 @@ class FileResolver:
         tmp_dir: Temporary directory for extracted files.
         stream_uid: Unique identifier for the stream based on file path hash.
         output_file: Path where the transcoded output will be written.
+        segment_pattern: Pattern for HLS segment filenames.
+        init_filename: Filename for HLS initialization segment.
+        streaming_format: Video streaming format ('hls' or 'mp4').
         duration: Duration of the media file in seconds.
     """
 
@@ -119,6 +122,7 @@ class FileResolver:
             self.output_file = f"{self.tmp_dir}/{self.stream_uid}.m3u8"
 
         self.segment_pattern = f"{self.tmp_dir}/{self.stream_uid}_segment_%03d.m4s"
+        self.init_filename = f"{self.stream_uid}_init.mp4"
 
     def handle_zipped_cdg(self, file_path: str) -> None:
         """Extract zipped CDG + MP3 files into a temporary directory.
