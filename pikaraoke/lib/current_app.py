@@ -69,7 +69,7 @@ def broadcast_event(event: str, data: Any = None) -> None:
     try:
         socketio = current_app.extensions.get('socketio')
         if socketio:
-            socketio.emit(event, data, namespace="/", broadcast=True)
+            socketio.emit(event, data, namespace="/")
         else:
             logging.error("SocketIO not found in app extensions")
     except Exception as e:
