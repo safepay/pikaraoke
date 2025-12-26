@@ -272,11 +272,13 @@
     }
 
     // Handle the Background music depending on the up_next and nowplaying status
-    if (np.up_next) {
+    // Stop background media when ANY song is playing or queued
+    if (np.now_playing || np.up_next) {
       idleTime = 0; // reset idle timer to clear screensaver
       playBGMusic(false);
       playBGVideo(false);
-    } else if (!np.now_playing) {
+    } else {
+      // Only start background when completely idle (no current song, no queue)
       setTimeout(() => {
         playBGMusic(true);
         playBGVideo(true)

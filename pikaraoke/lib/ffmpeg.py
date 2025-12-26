@@ -32,8 +32,9 @@ def build_ffmpeg_cmd(
     is_transposed = semitones != 0
     acodec = "aac" if is_transposed or normalize_audio or avsync != 0 else "copy"
 
-    # For WEBM files, use genpts to regenerate timestamps and fix VFR issues
-    if fr.file_extension == ".webm":
+    # For container formats that may have VFR or timestamp issues, use genpts
+    # This fixes playback issues with AVI, MOV, MKV, and WEBM when streaming
+    if fr.file_extension in [".webm", ".avi", ".mov", ".mkv"]:
         input = ffmpeg.input(fr.file_path, **{"fflags": "+genpts"})
     else:
         input = ffmpeg.input(fr.file_path)
