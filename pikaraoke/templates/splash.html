@@ -55,6 +55,7 @@
   var volume = 0.85;
   var isScoreShown = false;
   var hasBgVideo = "{{ has_bg_video }}" == 'True'
+  var currentVideoUrl = null;  // Track current video URL to prevent reload loops
 
   const scoreReviews = {
     low:[
@@ -109,6 +110,7 @@
       isScoreShown = false;
 	  }
     videoHasPlayed = false;
+    currentVideoUrl = null;  // Reset URL tracking when song ends
     const video = getVideoPlayer();
     video.pause();
     $("#video-source").attr("src", "");
@@ -301,17 +303,18 @@
     const video = getVideoPlayer();
 
     // Start playback if a valid now_playing_url is provided
-    if (
-      np.now_playing_url &&
-      !isMediaPlaying(video) &&
-      $("#video-container").is(":hidden")
-    ) {
+    // Only load video if URL has changed to prevent reload loops
+    if (np.now_playing_url && np.now_playing_url !== currentVideoUrl) {
       if (!confirmationDismissed) {
         console.log(
           'Browser is unable to play video. User did not confirm interaction prompt.'
         );
         endSong("interaction confirmation required");
+        return;  // Exit early if no confirmation
       }
+
+      // Track current URL to prevent reloading same video
+      currentVideoUrl = np.now_playing_url;
 
       // Use stream URL from backend (format determined by --streaming-format flag)
       const streamUrl = np.now_playing_url;
@@ -341,7 +344,12 @@
       // Stop background music before playing video
       playBGMusic(false);
 
-      video.play();
+      // Show video container immediately to prevent race condition
+      $("#video-container").show();
+
+      video.play().catch(err => {
+        console.error('Play failed:', err);
+      });
 
       // handle timeout if video fails to play
       setTimeout(() => {

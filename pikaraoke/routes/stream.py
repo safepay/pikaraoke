@@ -108,8 +108,11 @@ def stream_progressive_mp4(id):
 
         # Send init.mp4 header first (contains moov atom and codec info)
         if os.path.exists(init_path):
+            # Read file completely, close handle, then yield data
+            # This ensures file is closed before Windows cleanup attempts deletion
             with open(init_path, "rb") as f:
-                yield f.read()
+                init_data = f.read()
+            yield init_data
         else:
             # Fallback: init file not found, return error
             return
@@ -123,11 +126,19 @@ def stream_progressive_mp4(id):
             seg_path = os.path.join(tmp_dir, f"{id}_segment_{seg_idx:03d}.m4s")
 
             if os.path.exists(seg_path):
-                # Segment exists, read and send it
-                with open(seg_path, "rb") as f:
-                    yield f.read()
-                seg_idx += 1
-                empty_checks = 0  # Reset counter when segment found
+                # Read entire segment into memory, close file, then yield
+                # Prevents Windows file locking issues during cleanup
+                try:
+                    with open(seg_path, "rb") as f:
+                        segment_data = f.read()
+                    # File is now closed, safe to yield data
+                    yield segment_data
+                    seg_idx += 1
+                    empty_checks = 0  # Reset counter when segment found
+                except IOError as e:
+                    # Segment might be in use or deleted, skip it
+                    seg_idx += 1
+                    empty_checks = 0
             else:
                 # Segment doesn't exist yet, wait briefly
                 time.sleep(0.1)
