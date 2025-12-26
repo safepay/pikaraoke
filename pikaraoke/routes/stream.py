@@ -167,6 +167,41 @@ def stream_auto(id):
             return Response("Playlist not found", status=404)
 
 
+# Auto-detection routes for HLS segment and init files
+# These handle requests that come through /stream/auto/ path (relative URLs in HLS playlist)
+@stream_bp.route("/stream/auto/<filename>.m4s")
+def stream_auto_segment_m4s(filename):
+    """Serves HLS segments requested through /stream/auto/ path"""
+    print(f"[AUTO-DETECT] Serving segment: {filename}.m4s")
+    # Security: prevent directory traversal
+    if '..' in filename or '/' in filename:
+        return Response("Invalid segment", status=400)
+
+    segment_path = os.path.join(get_tmp_dir(), f"{filename}.m4s")
+
+    if os.path.exists(segment_path):
+        return send_file(segment_path, mimetype="video/mp4")
+    else:
+        print(f"[AUTO-DETECT] ERROR: Segment not found: {segment_path}")
+        return Response(f"Segment not found: {filename}.m4s", status=404)
+
+
+@stream_bp.route("/stream/auto/<filename>_init.mp4")
+def stream_auto_init(filename):
+    """Serves init.mp4 header file requested through /stream/auto/ path"""
+    print(f"[AUTO-DETECT] Serving init file: {filename}_init.mp4")
+    # Security: prevent directory traversal
+    if '..' in filename or '/' in filename:
+        return Response("Invalid init file", status=400)
+
+    init_path = os.path.join(get_tmp_dir(), f"{filename}_init.mp4")
+    if os.path.exists(init_path):
+        return send_file(init_path, mimetype="video/mp4")
+    else:
+        print(f"[AUTO-DETECT] ERROR: Init file not found: {init_path}")
+        return Response("Init file not found", status=404)
+
+
 # Main streaming route - serves HLS or progressive MP4 based on file extension
 @stream_bp.route("/stream/<id>")
 def stream_main(id):
