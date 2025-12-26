@@ -562,11 +562,13 @@
       // Fully stop the current stream
       video.pause();
       video.src = '';    // Clear source to stop old stream
+      currentVideoUrl = null;  // Reset URL tracking to allow reload if needed
       video.load();      // Unload old stream
 
       // Restart from beginning - wait for metadata before setting time
       // This works for both MP4 (progressive) and HLS (adaptive) streams
       video.src = currentSrc;
+      currentVideoUrl = currentSrc;  // Track the reloaded URL
       video.addEventListener('loadedmetadata', function onMetadata() {
         video.currentTime = 0;  // Set to beginning after metadata loads
         video.play();
