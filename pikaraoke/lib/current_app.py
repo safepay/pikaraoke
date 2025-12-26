@@ -63,17 +63,17 @@ def broadcast_event(event: str, data: Any = None) -> None:
         event: Name of the event to broadcast.
         data: Optional data payload to send with the event.
     """
-    logging.debug("Broadcasting event: " + event)
+    logging.debug(f"Broadcasting event: {event} with data: {data}")
 
-    # Access socketio from current_app extensions to avoid circular import
+    # Import at runtime to avoid circular import at module level
     try:
-        socketio = current_app.extensions.get('socketio')
-        if socketio:
-            socketio.emit(event, data, namespace="/")
-        else:
-            logging.error("SocketIO not found in app extensions")
+        from pikaraoke.app import socketio
+        socketio.emit(event, data, namespace="/")
+        logging.debug(f"Successfully broadcast event: {event}")
     except Exception as e:
         logging.error(f"Failed to broadcast event {event}: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 def delayed_halt(cmd: int) -> None:
