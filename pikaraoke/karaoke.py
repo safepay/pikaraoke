@@ -254,6 +254,14 @@ class Karaoke:
         self.high_score_phrases = self.get_user_preference("high_score_phrases") or ""
 
     def get_url(self):
+        """Get the URL for accessing the PiKaraoke web interface.
+
+        On Raspberry Pi, retries getting the IP address for up to 30 seconds
+        in case the network is still initializing at startup.
+
+        Returns:
+            URL string in format http://ip:port
+        """
         if self.is_raspberry_pi:
             # retry in case pi is still starting up
             # and doesn't have an IP yet (occurs when launched from /etc/rc.local)
