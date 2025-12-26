@@ -1,3 +1,5 @@
+"""FFmpeg utilities for media processing and transcoding."""
+
 import logging
 import subprocess
 
@@ -5,6 +7,14 @@ import ffmpeg
 
 
 def get_media_duration(file_path):
+    """Get the duration of a media file in seconds.
+
+    Args:
+        file_path: Path to the media file.
+
+    Returns:
+        Duration in seconds (rounded), or None if unable to determine.
+    """
     try:
         duration = ffmpeg.probe(file_path)["format"]["duration"]
         return round(float(duration))
@@ -20,6 +30,22 @@ def build_ffmpeg_cmd(
     avsync=0,
     cdg_pixel_scaling=False,
 ):
+    """Build an ffmpeg command for transcoding media.
+
+    Handles video/audio codec selection, pitch shifting, audio normalization,
+    and CDG file rendering.
+
+    Args:
+        fr: FileResolver instance with source file information.
+        semitones: Number of semitones to shift pitch (0 = no shift).
+        normalize_audio: Whether to apply loudness normalization.
+        buffer_fully_before_playback: If True, use faststart for full buffering.
+        avsync: Audio/video sync adjustment in seconds.
+        cdg_pixel_scaling: Enable pixel scaling for CDG rendering.
+
+    Returns:
+        ffmpeg OutputStream object ready to execute.
+    """
     avsync = float(avsync)
     # use h/w acceleration on pi
     default_vcodec = "h264_v4l2m2m" if supports_hardware_h264_encoding() else "libx264"
@@ -149,6 +175,12 @@ def build_ffmpeg_cmd(
 
 
 def get_ffmpeg_version():
+    """Get the installed FFmpeg version string.
+
+    Returns:
+        Version string, or an error message if FFmpeg is not installed
+        or version cannot be parsed.
+    """
     try:
         # Execute the command 'ffmpeg -version'
         result = subprocess.run(
@@ -165,6 +197,11 @@ def get_ffmpeg_version():
 
 
 def is_transpose_enabled():
+    """Check if FFmpeg has the rubberband filter for pitch shifting.
+
+    Returns:
+        True if rubberband filter is available, False otherwise.
+    """
     try:
         filters = subprocess.run(["ffmpeg", "-filters"], capture_output=True)
     except FileNotFoundError:
@@ -175,6 +212,11 @@ def is_transpose_enabled():
 
 
 def supports_hardware_h264_encoding():
+    """Check if hardware H.264 encoding (h264_v4l2m2m) is available.
+
+    Returns:
+        True if hardware encoding is available, False otherwise.
+    """
     try:
         codecs = subprocess.run(["ffmpeg", "-codecs"], capture_output=True)
     except FileNotFoundError:
@@ -185,6 +227,11 @@ def supports_hardware_h264_encoding():
 
 
 def is_ffmpeg_installed():
+    """Check if FFmpeg is installed and accessible.
+
+    Returns:
+        True if FFmpeg is installed, False otherwise.
+    """
     try:
         subprocess.run(["ffmpeg", "-version"], capture_output=True)
     except FileNotFoundError:
