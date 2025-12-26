@@ -1,8 +1,10 @@
 """File resolution and temporary file management utilities."""
 
+import logging
 import os
 import re
 import shutil
+import stat
 import tempfile
 import zipfile
 from sys import maxsize
@@ -30,10 +32,47 @@ def create_tmp_dir() -> None:
 
 
 def delete_tmp_dir() -> None:
-    """Delete the temporary directory and all its contents."""
+    """Delete the temporary directory and all its contents.
+
+    Handles Windows file locking issues gracefully. If files are still locked
+    by FFmpeg or the browser, logs a warning instead of crashing. Files will
+    be cleaned up on next skip or app restart.
+    """
     tmp_dir = get_tmp_dir()
-    if os.path.exists(tmp_dir):
-        shutil.rmtree(tmp_dir)
+    if not os.path.exists(tmp_dir):
+        return
+
+    def handle_remove_error(func, path, exc_info):
+        """Error handler for shutil.rmtree to handle Windows file locking.
+
+        Attempts to change file permissions and retry. If that fails,
+        logs a warning instead of crashing (files locked by FFmpeg/browser).
+        """
+        # exc_info is a tuple: (type, value, traceback)
+        exc_type, exc_value = exc_info[:2]
+
+        # Check if it's a permission error (common on Windows)
+        if exc_type in (PermissionError, OSError):
+            # Try to change permissions and retry
+            try:
+                os.chmod(path, stat.S_IWRITE)
+                func(path)
+            except Exception as e:
+                # Still failed - file is locked by another process (FFmpeg/browser)
+                # This is expected on Windows, just log and continue
+                logging.warning(
+                    f"Could not delete {path}: {exc_value}. "
+                    "File may still be in use. Will be cleaned up later."
+                )
+        else:
+            # Unexpected error type, log it
+            logging.error(f"Unexpected error deleting {path}: {exc_value}")
+
+    try:
+        shutil.rmtree(tmp_dir, onerror=handle_remove_error)
+    except Exception as e:
+        # Final safety net - should not reach here due to onerror handler
+        logging.warning(f"Could not fully delete temp directory {tmp_dir}: {e}")
 
 
 def string_to_hash(s: str) -> int:
