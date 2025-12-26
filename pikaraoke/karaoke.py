@@ -681,7 +681,7 @@ class Karaoke:
         elif self.streaming_format == "hls":
             stream_url_path = f"/stream/{fr.stream_uid}.m3u8"
         else:  # auto - server-side detection based on User-Agent
-            stream_url_path = f"/stream/auto/{fr.stream_uid}"
+            stream_url_path = f"/stream/auto/{fr.stream_uid}.m3u8"
 
         # For non-transcoded files, still use direct MP4 serving
         if not requires_transcoding:
