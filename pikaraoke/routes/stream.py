@@ -89,42 +89,51 @@ def stream_main(id):
         return stream_playlist(id)
 
 
-# Progressive MP4 streaming with chunking (for older RPi)
+# Progressive MP4 streaming with init.mp4 + segments concatenation
+# This method works with HLS-generated fMP4 segments but serves them as continuous MP4
+# Compatible with Chrome, Firefox, Safari, and RPi with hardware acceleration
 @stream_bp.route("/stream/<id>.mp4")
 def stream_progressive_mp4(id):
-    file_path = os.path.join(get_tmp_dir(), f"{id}.mp4")
-    k = get_karaoke_instance()
+    tmp_dir = get_tmp_dir()
 
-    # Wait for file to exist
-    max_wait = 50
-    wait_count = 0
-    while not os.path.exists(file_path) and wait_count < max_wait:
-        time.sleep(0.1)
-        wait_count += 1
+    def generate_mp4_stream():
+        init_path = os.path.join(tmp_dir, f"{id}_init.mp4")
 
-    if not os.path.exists(file_path):
-        return Response("MP4 file not found", status=404)
+        # Wait for init file to be created
+        max_wait = 100  # 10 seconds max
+        wait_count = 0
+        while not os.path.exists(init_path) and wait_count < max_wait:
+            time.sleep(0.1)
+            wait_count += 1
 
-    # Stream with chunking (PR#573 optimization for RPi)
-    def generate():
-        chunk_size = 1024 * 1024 * 2  # 2MB chunks (reduced from 25MB for Raspberry Pi)
-        with open(file_path, "rb") as file:
-            # Keep yielding file chunks as long as ffmpeg process is transcoding
-            while k.ffmpeg_process.poll() is None:
-                chunk = file.read(chunk_size)
-                if chunk:
-                    yield chunk
-                else:
-                    # No data available yet, wait briefly for ffmpeg to produce more
-                    time.sleep(0.05)
-            # Read any remaining data after transcoding completes
-            while True:
-                chunk = file.read(chunk_size)
-                if not chunk:
-                    break
-                yield chunk
+        # Send init.mp4 header first (contains moov atom and codec info)
+        if os.path.exists(init_path):
+            with open(init_path, "rb") as f:
+                yield f.read()
+        else:
+            # Fallback: init file not found, return error
+            return
 
-    return Response(generate(), mimetype="video/mp4")
+        # Stream fMP4 segments as they become available
+        seg_idx = 0
+        max_empty_checks = 50  # 5 seconds of no new segments
+        empty_checks = 0
+
+        while empty_checks < max_empty_checks:
+            seg_path = os.path.join(tmp_dir, f"{id}_segment_{seg_idx:03d}.m4s")
+
+            if os.path.exists(seg_path):
+                # Segment exists, read and send it
+                with open(seg_path, "rb") as f:
+                    yield f.read()
+                seg_idx += 1
+                empty_checks = 0  # Reset counter when segment found
+            else:
+                # Segment doesn't exist yet, wait briefly
+                time.sleep(0.1)
+                empty_checks += 1
+
+    return Response(generate_mp4_stream(), mimetype="video/mp4")
 
 
 def stream_file_path_full(file_path):
