@@ -472,6 +472,9 @@ class Karaoke:
             if self.now_playing_notification != None:
                 return
             self.now_playing_notification = message + "::is-" + color
+            # Emit notification via SocketIO for event-driven architecture
+            if self.socketio:
+                self.socketio.emit("notification", self.now_playing_notification, namespace="/")
 
     def log_and_send(self, message: str, category: str = "info") -> None:
         """Log a message and send it as a notification.
