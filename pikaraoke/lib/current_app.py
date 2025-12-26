@@ -8,7 +8,6 @@ import time
 from typing import Any
 
 from flask import current_app, request
-from flask_socketio import emit
 
 from pikaraoke.karaoke import Karaoke
 
@@ -58,12 +57,19 @@ def get_site_name() -> str:
 def broadcast_event(event: str, data: Any = None) -> None:
     """Broadcast a SocketIO event to all connected clients.
 
+    Works from both SocketIO event handlers and regular HTTP routes.
+
     Args:
         event: Name of the event to broadcast.
         data: Optional data payload to send with the event.
     """
     logging.debug("Broadcasting event: " + event)
-    emit(event, data, namespace="/", broadcast=True)
+
+    # Import here to avoid circular dependency
+    from pikaraoke.app import socketio
+
+    # Use socketio.emit() instead of bare emit() to work from HTTP routes
+    socketio.emit(event, data, namespace="/", broadcast=True)
 
 
 def delayed_halt(cmd: int) -> None:
