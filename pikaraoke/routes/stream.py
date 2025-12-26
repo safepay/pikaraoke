@@ -87,12 +87,27 @@ def stream_auto(id):
     user_agent = request.headers.get('User-Agent', '').lower()
     tmp_dir = get_tmp_dir()
 
-    # Detection: Chrome/Chromium browsers don't support HLS natively
-    # Serve progressive MP4 to Chrome (Windows + RPi), HLS to Safari/Smart TVs
-    # Note: Chrome user agent includes "Safari" string, so we only check for "chrome"
-    is_chrome = "chrome" in user_agent and "smart-tv" not in user_agent
+    # Enhanced browser/device detection for optimal streaming format
+    # Smart TVs: Samsung Tizen, LG webOS, Sony Bravia, etc. have native HLS support
+    is_smart_tv = any([
+        'smart-tv' in user_agent,
+        'smarttv' in user_agent,
+        'tizen' in user_agent,
+        'webos' in user_agent,
+        'hbbtv' in user_agent,
+        'bravia' in user_agent,
+        'netcast' in user_agent,  # LG
+        'viera' in user_agent,    # Panasonic
+    ])
 
-    if is_chrome:
+    # Safari (macOS/iOS) has native HLS support
+    is_safari = 'safari' in user_agent and 'chrome' not in user_agent
+
+    # Serve HLS to Smart TVs and Safari, MP4 to Chrome/Chromium/Firefox
+    # MP4 is safer fallback for browsers without native HLS (Chrome <2025, Firefox)
+    use_hls = is_smart_tv or is_safari
+
+    if not use_hls:
         # Serve continuous MP4 stream for RPi hardware acceleration
         def generate_mp4_stream():
             init_path = os.path.join(tmp_dir, f"{id}_init.mp4")
