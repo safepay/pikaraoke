@@ -107,8 +107,15 @@ def stream_auto(id):
     # MP4 is safer fallback for browsers without native HLS (Chrome <2025, Firefox)
     use_hls = is_smart_tv or is_safari
 
+    # Diagnostic logging
+    print(f"[AUTO-DETECT] Request for stream ID: {id}")
+    print(f"[AUTO-DETECT] User-Agent: {user_agent}")
+    print(f"[AUTO-DETECT] is_smart_tv={is_smart_tv}, is_safari={is_safari}")
+    print(f"[AUTO-DETECT] Decision: Serving {'HLS' if use_hls else 'MP4'}")
+
     if not use_hls:
         # Serve continuous MP4 stream for RPi hardware acceleration
+        print(f"[AUTO-DETECT] Serving continuous MP4 stream for {id}")
         def generate_mp4_stream():
             init_path = os.path.join(tmp_dir, f"{id}_init.mp4")
             # Wait for init file
@@ -119,8 +126,11 @@ def stream_auto(id):
                 wait_count += 1
 
             if os.path.exists(init_path):
+                print(f"[AUTO-DETECT] Found init file: {init_path}")
                 with open(init_path, "rb") as f:
                     yield f.read()
+            else:
+                print(f"[AUTO-DETECT] ERROR: Init file not found: {init_path}")
 
             # Stream segments as they become available
             seg_idx = 0
@@ -140,6 +150,7 @@ def stream_auto(id):
         return Response(generate_mp4_stream(), mimetype='video/mp4')
     else:
         # Serve standard HLS for Smart TVs
+        print(f"[AUTO-DETECT] Serving HLS playlist for {id}")
         playlist_path = os.path.join(tmp_dir, f"{id}.m3u8")
         # Wait for playlist
         max_wait = 50
@@ -149,8 +160,10 @@ def stream_auto(id):
             wait_count += 1
 
         if os.path.exists(playlist_path):
+            print(f"[AUTO-DETECT] Found HLS playlist: {playlist_path}")
             return send_file(playlist_path, mimetype="application/vnd.apple.mpegurl")
         else:
+            print(f"[AUTO-DETECT] ERROR: Playlist not found: {playlist_path}")
             return Response("Playlist not found", status=404)
 
 
