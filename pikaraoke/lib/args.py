@@ -325,11 +325,11 @@ def parse_pikaraoke_args() -> argparse.Namespace:
     if args.streaming_format == "auto":
         if should_use_mp4_streaming():
             args.streaming_format = "mp4"
-            logging.debug("Auto-detected older Raspberry Pi hardware. Using MP4 streaming format.")
+            print("Auto-detected older Raspberry Pi hardware. Using MP4 streaming format.")
         else:
             args.streaming_format = "hls"
-            logging.debug("Using HLS streaming format (auto-detection).")
+            print("Streaming format set to: HLS (auto-detection - Smart TV/Safari)")
     else:
-        logging.debug(f"Streaming format set to: {args.streaming_format}")
+        print(f"Streaming format set to: {args.streaming_format}")
 
     return args
