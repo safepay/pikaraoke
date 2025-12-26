@@ -3,7 +3,7 @@ import re
 import time
 
 import flask_babel
-from flask import Blueprint, Response, flash, redirect, request, send_file, url_for
+from flask import Blueprint, Response, flash, make_response, redirect, request, send_file, url_for
 
 from pikaraoke.lib.current_app import get_karaoke_instance
 from pikaraoke.lib.file_resolver import get_tmp_dir
@@ -161,7 +161,12 @@ def stream_auto(id):
 
         if os.path.exists(playlist_path):
             print(f"[AUTO-DETECT] Found HLS playlist: {playlist_path}")
-            return send_file(playlist_path, mimetype="application/vnd.apple.mpegurl")
+            response = make_response(send_file(playlist_path, mimetype="application/vnd.apple.mpegurl"))
+            # Prevent Smart TV caching - each stream must be unique
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+            return response
         else:
             print(f"[AUTO-DETECT] ERROR: Playlist not found: {playlist_path}")
             return Response("Playlist not found", status=404)
@@ -180,7 +185,12 @@ def stream_auto_segment_m4s(filename):
     segment_path = os.path.join(get_tmp_dir(), f"{filename}.m4s")
 
     if os.path.exists(segment_path):
-        return send_file(segment_path, mimetype="video/mp4")
+        response = make_response(send_file(segment_path, mimetype="video/mp4"))
+        # Prevent Smart TV caching
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
     else:
         print(f"[AUTO-DETECT] ERROR: Segment not found: {segment_path}")
         return Response(f"Segment not found: {filename}.m4s", status=404)
@@ -196,7 +206,12 @@ def stream_auto_init(filename):
 
     init_path = os.path.join(get_tmp_dir(), f"{filename}_init.mp4")
     if os.path.exists(init_path):
-        return send_file(init_path, mimetype="video/mp4")
+        response = make_response(send_file(init_path, mimetype="video/mp4"))
+        # Prevent Smart TV caching
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
     else:
         print(f"[AUTO-DETECT] ERROR: Init file not found: {init_path}")
         return Response("Init file not found", status=404)
