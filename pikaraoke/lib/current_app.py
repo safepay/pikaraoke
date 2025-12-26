@@ -65,11 +65,15 @@ def broadcast_event(event: str, data: Any = None) -> None:
     """
     logging.debug("Broadcasting event: " + event)
 
-    # Import here to avoid circular dependency
-    from pikaraoke.app import socketio
-
-    # Use socketio.emit() instead of bare emit() to work from HTTP routes
-    socketio.emit(event, data, namespace="/", broadcast=True)
+    # Access socketio from current_app extensions to avoid circular import
+    try:
+        socketio = current_app.extensions.get('socketio')
+        if socketio:
+            socketio.emit(event, data, namespace="/", broadcast=True)
+        else:
+            logging.error("SocketIO not found in app extensions")
+    except Exception as e:
+        logging.error(f"Failed to broadcast event {event}: {e}")
 
 
 def delayed_halt(cmd: int) -> None:
