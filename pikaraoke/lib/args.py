@@ -321,7 +321,4 @@ def parse_pikaraoke_args() -> argparse.Namespace:
     args.bg_video_path = bg_video_path
     args.download_path = dl_path
 
-    # Log streaming format choice
-    print(f"Streaming format: {args.streaming_format}")
-
     return args

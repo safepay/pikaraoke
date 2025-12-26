@@ -141,6 +141,7 @@ def main() -> None:
     platform = get_platform()
 
     args = parse_pikaraoke_args()
+    print(f"Streaming format: {args.streaming_format}")
 
     if not is_ffmpeg_installed():
         logging.error(
