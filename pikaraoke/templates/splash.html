@@ -320,6 +320,10 @@
       const streamUrl = np.now_playing_url;
       console.log('Loading video:', streamUrl);
 
+      // Stop any pending animations (from skip/pause handlers) to prevent
+      // them from calling pause() on the new video
+      $(video).stop(true, false);
+
       // Clear the source first to prevent browser from caching old HLS playlist
       $("#video-source").attr("src", "");
       video.load();
