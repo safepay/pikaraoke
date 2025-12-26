@@ -103,25 +103,15 @@ def stream_auto(id):
     # Safari (macOS/iOS) has native HLS support
     is_safari = 'safari' in user_agent and 'chrome' not in user_agent
 
-    # Chrome 120+ (2025 release) added native HLS support
-    is_chrome_hls = False
-    if 'chrome/' in user_agent:
-        import re
-        chrome_match = re.search(r'chrome/(\d+)', user_agent)
-        if chrome_match:
-            chrome_version = int(chrome_match.group(1))
-            is_chrome_hls = chrome_version >= 120
-
-    # Serve HLS to: Smart TVs, Safari, and Chrome 120+
-    # Serve MP4 to: older Chrome, Firefox, and other browsers
-    use_hls = is_smart_tv or is_safari or is_chrome_hls
+    # Serve HLS to Smart TVs and Safari, MP4 to Chrome/Chromium/Firefox
+    use_hls = is_smart_tv or is_safari
 
     # Diagnostic logging
     print(f"[AUTO-DETECT] Request path: {request.path}")
     print(f"[AUTO-DETECT] Request full URL: {request.url}")
     print(f"[AUTO-DETECT] Parsed stream ID: {id}")
     print(f"[AUTO-DETECT] User-Agent: {user_agent}")
-    print(f"[AUTO-DETECT] is_smart_tv={is_smart_tv}, is_safari={is_safari}, is_chrome_hls={is_chrome_hls}")
+    print(f"[AUTO-DETECT] is_smart_tv={is_smart_tv}, is_safari={is_safari}")
     print(f"[AUTO-DETECT] Decision: Serving {'HLS' if use_hls else 'MP4'}")
 
     if not use_hls:
