@@ -303,6 +303,10 @@
         );
         endSong("interaction confirmation required");
       }
+
+      // Stop any pending jQuery animations to prevent race conditions
+      $(video).stop(true, false);
+
       $("#video-source").attr("src", np.now_playing_url);
       video.load();
       if (volume != np.volume) {
@@ -512,6 +516,10 @@
     socket.on('restart', () => {
       console.log(`Restart`);
       const video = getVideoPlayer();
+
+      // Stop any pending jQuery animations to prevent race conditions
+      $(video).stop(true, false);
+
       video.currentTime = 0;
       if (video.paused) video.play()
     });
@@ -682,7 +690,7 @@
 
   <div id="menu-background" class="overlay"></div>
    <div id="menu-container" class="">
-     <iframe src="/"></iframe>
+     <iframe src=""></iframe>
    </div>
 
 
