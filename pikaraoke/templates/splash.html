@@ -31,16 +31,9 @@
   const isFirefox = typeof InstallTrigger !== "undefined";
   const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-  // Prevent splash handlers from running in iframe context
-  const isInIframe = window.self !== window.top;
-
-  var socket;
-  if (!isInIframe) {
-    socket = io();
-  }
+  var socket = io();
 
   function connectSocket() {
-    if (isInIframe) return;
     socket = io();
     socket.on('connect', function() {
         console.log('Socket connected');
@@ -350,12 +343,6 @@
 
   // ** Post page load actions and event handlers **
   $(function () {
-    // Skip initialization if running in iframe context
-    if (isInIframe) {
-      console.log('Splash screen loaded in iframe context, skipping handlers');
-      return;
-    }
-
     $('#video-container').hide();
 
     if ('{{ hide_overlay }}' == 'True') {
