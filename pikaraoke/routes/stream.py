@@ -108,7 +108,9 @@ def stream_auto(id):
     use_hls = is_smart_tv or is_safari
 
     # Diagnostic logging
-    print(f"[AUTO-DETECT] Request for stream ID: {id}")
+    print(f"[AUTO-DETECT] Request path: {request.path}")
+    print(f"[AUTO-DETECT] Request full URL: {request.url}")
+    print(f"[AUTO-DETECT] Parsed stream ID: {id}")
     print(f"[AUTO-DETECT] User-Agent: {user_agent}")
     print(f"[AUTO-DETECT] is_smart_tv={is_smart_tv}, is_safari={is_safari}")
     print(f"[AUTO-DETECT] Decision: Serving {'HLS' if use_hls else 'MP4'}")
