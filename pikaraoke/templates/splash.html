@@ -35,6 +35,9 @@
 
   var socket = io();
 
+  // Detect if we're in an iframe (menu context) to prevent interference with main page video
+  var isInIframe = window.self !== window.top;
+
   function connectSocket() {
     socket = io();
     socket.on('connect', function() {
@@ -502,83 +505,86 @@
       }
     }
 
-    socket.on('pause', () => {
-      const video = getVideoPlayer();
-      const currVolume = video.volume;
-      if (!video.paused) {
-        $(video).animate({ volume: 0 }, 1000, () => {
-          video.pause();
-          video.volume = currVolume;
-        });
-        console.log(`Pause`);
-      }
-    });
-
-    socket.on('play', () => {
-      const video = getVideoPlayer();
-      const currVolume = video.volume;
-      if (video.paused) {
-        video.play();
-        video.volume = 0;
-        $(video).animate({ volume: currVolume }, 1000);
-        console.log(`Play`);
-      }
-    });
-
-    socket.on('skip', (reason) => {
-      const video = getVideoPlayer();
-      const currVolume = video.volume;
-      if (isMediaPlaying(video)) {
-        // Fade out if currently playing
-        $(video).animate({ volume: 0 }, 1000, () => {
+    // Only set up video control handlers if NOT in iframe (prevents menu iframe interference)
+    if (!isInIframe) {
+      socket.on('pause', () => {
+        const video = getVideoPlayer();
+        const currVolume = video.volume;
+        if (!video.paused) {
+          $(video).animate({ volume: 0 }, 1000, () => {
             video.pause();
             video.volume = currVolume;
-            hideVideo();
           });
-      } else {
-        // Immediately hide if paused or stopped
+          console.log(`Pause`);
+        }
+      });
+
+      socket.on('play', () => {
+        const video = getVideoPlayer();
+        const currVolume = video.volume;
+        if (video.paused) {
+          video.play();
+          video.volume = 0;
+          $(video).animate({ volume: currVolume }, 1000);
+          console.log(`Play`);
+        }
+      });
+
+      socket.on('skip', (reason) => {
+        const video = getVideoPlayer();
+        const currVolume = video.volume;
+        if (isMediaPlaying(video)) {
+          // Fade out if currently playing
+          $(video).animate({ volume: 0 }, 1000, () => {
+              video.pause();
+              video.volume = currVolume;
+              hideVideo();
+            });
+        } else {
+          // Immediately hide if paused or stopped
+          video.pause();
+          hideVideo();
+        }
+        console.log(`Skip: ${reason}`);
+      });
+
+      socket.on('volume', (val) => {
+        const video = getVideoPlayer();
+        if (val == "up") {
+          console.log(`Volume up`);
+          video.volume = Math.min(1, video.volume + 0.1);
+        } else if (val == "down") {
+          console.log(`Volume down`);
+          video.volume = Math.max(0, video.volume - 0.1);
+        }
+        else {
+          console.log(`Volume: ${video.volume}`);
+          video.volume = val;
+        }
+      });
+
+      socket.on('restart', () => {
+        console.log(`Restart`);
+        const video = getVideoPlayer();
+        const currentSrc = video.src || $("#video-source").attr("src");
+
+        // Fully stop the current stream
         video.pause();
-        hideVideo();
-      }
-	  console.log(`Skip: ${reason}`);
-    });
+        video.src = '';    // Clear source to stop old stream
+        currentVideoUrl = null;  // Reset URL tracking to allow reload if needed
+        video.load();      // Unload old stream
 
-    socket.on('volume', (val) => {
-      const video = getVideoPlayer();
-      if (val == "up") {
-        console.log(`Volume up`);
-        video.volume = Math.min(1, video.volume + 0.1);
-      } else if (val == "down") {
-        console.log(`Volume down`);
-        video.volume = Math.max(0, video.volume - 0.1);
-      }
-      else {
-        console.log(`Volume: ${video.volume}`);
-        video.volume = val;
-      }
-    });
-
-    socket.on('restart', () => {
-      console.log(`Restart`);
-      const video = getVideoPlayer();
-      const currentSrc = video.src || $("#video-source").attr("src");
-
-      // Fully stop the current stream
-      video.pause();
-      video.src = '';    // Clear source to stop old stream
-      currentVideoUrl = null;  // Reset URL tracking to allow reload if needed
-      video.load();      // Unload old stream
-
-      // Restart from beginning - wait for metadata before setting time
-      // This works for both MP4 (progressive) and HLS (adaptive) streams
-      video.src = currentSrc;
-      currentVideoUrl = currentSrc;  // Track the reloaded URL
-      video.addEventListener('loadedmetadata', function onMetadata() {
-        video.currentTime = 0;  // Set to beginning after metadata loads
-        video.play();
-      }, { once: true });
-      video.load();
-    });
+        // Restart from beginning - wait for metadata before setting time
+        // This works for both MP4 (progressive) and HLS (adaptive) streams
+        video.src = currentSrc;
+        currentVideoUrl = currentSrc;  // Track the reloaded URL
+        video.addEventListener('loadedmetadata', function onMetadata() {
+          video.currentTime = 0;  // Set to beginning after metadata loads
+          video.play();
+        }, { once: true });
+        video.load();
+      });
+    }
 
     socket.on("notification", (data) => {
       const notification = data.split("::");
@@ -588,22 +594,26 @@
       socket.emit("clear_notification");
     });
 
-    //for first time load of splash screen
-    loadNowPlaying();
+    //for first time load of splash screen (only in main page, not iframe)
+    if (!isInIframe) {
+      loadNowPlaying();
 
-    //for socket pushed updates to now playing state
-    socket.on("now_playing", np => handleNowPlaying(np));
+      //for socket pushed updates to now playing state
+      socket.on("now_playing", np => handleNowPlaying(np));
+    }
 
-    // reconnect socket / refresh if tab is hidden and then visible
-    document.addEventListener("visibilitychange", function() {
-      if (document.visibilityState === 'visible') {
-        loadNowPlaying();
-        if (!socket.connected) {
-            console.log('Reconnecting socket...');
-            connectSocket();
+    // reconnect socket / refresh if tab is hidden and then visible (only in main page)
+    if (!isInIframe) {
+      document.addEventListener("visibilitychange", function() {
+        if (document.visibilityState === 'visible') {
+          loadNowPlaying();
+          if (!socket.connected) {
+              console.log('Reconnecting socket...');
+              connectSocket();
+          }
         }
-      }
-    });
+      });
+    }
 
   });
 </script>
