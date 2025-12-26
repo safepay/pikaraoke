@@ -288,9 +288,9 @@ def parse_pikaraoke_args() -> argparse.Namespace:
     ),
     parser.add_argument(
         "--streaming-format",
-        help="Video streaming format: 'hls' (HLS with fMP4 segments - works on Smart TVs, Safari, modern browsers), 'mp4' (progressive MP4 with movflags - for older RPi Chromium), or 'auto' (auto-detect based on hardware). Default is 'auto'.",
-        choices=["hls", "mp4", "auto"],
-        default="auto",
+        help="Video streaming format: 'hls' (HLS with fMP4 segments - for Smart TVs) or 'mp4' (progressive MP4 - for Chrome, Firefox, Safari, RPi). Default is 'mp4'. Smart TV users should use --streaming-format hls.",
+        choices=["hls", "mp4"],
+        default="mp4",
         required=False,
     ),
 
@@ -322,9 +322,6 @@ def parse_pikaraoke_args() -> argparse.Namespace:
     args.download_path = dl_path
 
     # Log streaming format choice
-    if args.streaming_format == "auto":
-        print("Streaming format: auto (browser-based detection - Smart TV/Safari→HLS, Chrome/Firefox→MP4)")
-    else:
-        print(f"Streaming format: {args.streaming_format} (manual override)")
+    print(f"Streaming format: {args.streaming_format}")
 
     return args
