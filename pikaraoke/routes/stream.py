@@ -76,13 +76,14 @@ def stream_segment(filename):
         return Response(f"Segment not found: {filename}.ts", status=404)
 
 
-# Smart auto-detection route - serves continuous MP4 to RPi, HLS to Smart TVs
-# Supports both /stream/auto/<id> and /stream/auto/<id>.m3u8
+# Smart auto-detection route - serves continuous MP4 to Chrome, HLS to Smart TVs
+# Supports /stream/auto/<id>, /stream/auto/<id>.m3u8, and /stream/auto/<id>.mp4
 @stream_bp.route("/stream/auto/<id>")
 @stream_bp.route("/stream/auto/<id>.m3u8")
+@stream_bp.route("/stream/auto/<id>.mp4")
 def stream_auto(id):
-    # Remove .m3u8 extension if present
-    id = id.replace('.m3u8', '')
+    # Remove extensions if present
+    id = id.replace('.m3u8', '').replace('.mp4', '')
 
     user_agent = request.headers.get('User-Agent', '').lower()
     tmp_dir = get_tmp_dir()

@@ -313,10 +313,30 @@
         endSong("interaction confirmation required");
       }
 
-      // Use HLS streaming - native support on Safari and Smart TVs
-      const streamUrl = np.now_playing_url;
+      // Detect Smart TV vs regular browser for correct file extension
+      const userAgent = navigator.userAgent.toLowerCase();
+      const isSmartTV = userAgent.includes('smart-tv') ||
+                        userAgent.includes('smarttv') ||
+                        userAgent.includes('tizen') ||
+                        userAgent.includes('webos') ||
+                        userAgent.includes('hbbtv') ||
+                        userAgent.includes('bravia') ||
+                        userAgent.includes('netcast') ||
+                        userAgent.includes('viera');
+      const isSafari = /safari/.test(userAgent) && !/chrome/.test(userAgent);
+
+      // Get base URL and adjust extension based on browser capabilities
+      // Smart TVs and Safari need .m3u8 for HLS recognition
+      // Chrome/Firefox need .mp4 extension to match MP4 stream format
+      let streamUrl = np.now_playing_url;
+      if (!isSmartTV && !isSafari) {
+        // Change .m3u8 to .mp4 for Chrome/Firefox
+        streamUrl = streamUrl.replace('.m3u8', '.mp4');
+      }
+
       console.log('Loading video:', streamUrl);
       console.log('User Agent:', navigator.userAgent);
+      console.log('Browser type:', isSmartTV ? 'Smart TV' : isSafari ? 'Safari' : 'Chrome/Firefox');
 
       // Clear the source first to prevent browser from caching old HLS playlist
       $("#video-source").attr("src", "");
