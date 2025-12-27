@@ -803,10 +803,32 @@ class Karaoke:
                 self.end_song()
 
     def kill_ffmpeg(self) -> None:
-        """Terminate the running FFmpeg process if any."""
-        logging.debug("Killing ffmpeg process")
+        """Terminate the running FFmpeg process gracefully.
+
+        Uses SIGTERM first to allow FFmpeg to clean up resources properly,
+        then SIGKILL if process doesn't terminate within timeout.
+        This is critical for Raspberry Pi to release GPU memory from h264_v4l2m2m encoder.
+        """
         if self.ffmpeg_process:
-            self.ffmpeg_process.kill()
+            logging.debug("Terminating ffmpeg process gracefully")
+            try:
+                # First attempt: graceful termination (SIGTERM)
+                self.ffmpeg_process.terminate()
+                # Wait up to 5 seconds for graceful shutdown
+                self.ffmpeg_process.wait(timeout=5)
+                logging.debug("FFmpeg process terminated gracefully")
+            except subprocess.TimeoutExpired:
+                # Process didn't terminate, force kill (SIGKILL)
+                logging.warning("FFmpeg did not terminate gracefully, forcing kill")
+                self.ffmpeg_process.kill()
+                # Ensure process is fully dead and reaped (prevents zombies)
+                self.ffmpeg_process.wait()
+                logging.debug("FFmpeg process force killed")
+            except Exception as e:
+                # Catch any other errors (process already dead, etc.)
+                logging.debug(f"FFmpeg termination exception: {e}")
+            finally:
+                self.ffmpeg_process = None
 
     def start_song(self) -> None:
         """Mark the current song as actively playing."""
@@ -827,8 +849,11 @@ class Karaoke:
                 self.send_notification(_("Song ended abnormally: %s") % reason, "danger")
         self.reset_now_playing()
         self.kill_ffmpeg()
+        # Small delay to ensure FFmpeg fully terminates and file handles close
+        # Critical on Raspberry Pi with slow SD cards and hardware encoder cleanup
+        time.sleep(0.3)
         delete_tmp_dir()
-        logging.debug("ffmpeg process killed")
+        logging.debug("Cleanup complete")
 
     def transpose_current(self, semitones: int) -> None:
         """Restart the current song with a new transpose value.

@@ -48,11 +48,19 @@ def build_ffmpeg_cmd(
     """
     avsync = float(avsync)
     # use h/w acceleration on pi
-    default_vcodec = "h264_v4l2m2m" if supports_hardware_h264_encoding() else "libx264"
+    using_hardware_encoder = supports_hardware_h264_encoding()
+    default_vcodec = "h264_v4l2m2m" if using_hardware_encoder else "libx264"
     # just copy the video stream if it's an mp4 file (already H.264 compatible)
     # webm uses VP8/VP9 which must be transcoded to H.264 for fMP4 containers
     vcodec = "copy" if fr.file_extension == ".mp4" else default_vcodec
-    vbitrate = "5M"  # seems to yield best results w/ h264_v4l2m2m on pi, recommended for 720p.
+
+    # Optimize bitrate for Raspberry Pi hardware encoder
+    # Pi 3B+ struggles with 5M bitrate in real-time, 2M provides better stability
+    # while maintaining good quality for karaoke videos
+    if using_hardware_encoder:
+        vbitrate = "2M"  # Optimized for Pi h264_v4l2m2m real-time encoding
+    else:
+        vbitrate = "5M"  # Higher quality for more powerful hardware
 
     # copy the audio stream if no transposition/normalization, otherwise reincode with the aac codec
     is_transposed = semitones != 0
