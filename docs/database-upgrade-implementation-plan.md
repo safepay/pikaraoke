@@ -93,6 +93,7 @@ ______________________________________________________________________
 - Implement library synchronization with move/rename detection
 - Implement backup/restore using SQLite backup API
 - Add database integrity checking
+- Add development tooling for database inspection (optional, dev-only)
 
 **Success Criteria:**
 
@@ -103,12 +104,68 @@ ______________________________________________________________________
 - \[ \] `check_integrity()` validates database health
 - \[ \] Unit tests pass for all edge cases
 - \[ \] Handles CDG/ASS paired files correctly
+- \[ \] Development database viewer accessible when `--dev-mode` flag is enabled
 
 **Deliverables:**
 
 1. `pikaraoke/lib/karaoke_database.py` - Main database class
 2. Unit tests in `tests/test_karaoke_database.py`
 3. Migration script for existing installations (if needed)
+4. Development database viewer integration (dev-only feature)
+
+**Development Tooling:**
+
+To assist with database development, inspection, and debugging during Stages 1-4, a lightweight web-based SQLite viewer will be integrated:
+
+- **Tool:** [sqlite-web](https://github.com/coleifer/sqlite-web)
+- **Installation:** `uv add --dev sqlite-web`
+- **Access:** Navigate to `http://localhost:5555/dev/database` when running with `--dev-mode` flag
+- **Security:**
+  - Only available when `--dev-mode` command-line flag is explicitly set
+  - Protected by existing `@is_admin` decorator
+  - Never deployed to production (flag not passed in release builds)
+  - Can be configured as read-only or read-write based on development needs
+
+**Features:**
+
+- Execute SQL queries directly against the database
+- Browse all tables and their contents
+- Inspect schema and indexes
+- View query execution plans
+- Export data to CSV/JSON
+- Monitor database statistics
+
+**Implementation Example:**
+
+```python
+# In pikaraoke/app.py (or relevant initialization file)
+if args.dev_mode:
+    try:
+        from sqlite_web import SqliteWebBlueprint
+
+        db_path = os.path.join(get_data_directory(), "pikaraoke.db")
+        db_blueprint = SqliteWebBlueprint(
+            database=db_path,
+            name="dev_database",
+            read_only=False,  # Allow modifications during development
+        )
+        app.register_blueprint(db_blueprint, url_prefix="/dev/database")
+        logger.info("Development database viewer enabled at /dev/database")
+    except ImportError:
+        logger.warning("sqlite-web not installed. Run: uv add --dev sqlite-web")
+```
+
+**Usage During Development:**
+
+```bash
+# Start PiKaraoke with development mode
+python -m pikaraoke --dev-mode
+
+# Access the database viewer
+# Navigate to: http://localhost:5555/dev/database
+```
+
+**Note:** This development tool is designed to be removed before deployment by simply not passing the `--dev-mode` flag. It provides deep database inspection capabilities that complement the user-facing admin features planned for Stage 3.
 
 **Pause Point:** Validate database operations in isolation before integrating into main app.
 
@@ -428,6 +485,9 @@ ______________________________________________________________________
 
 ### Modified Files
 
+- \[ \] `pikaraoke/app.py` - Development database viewer integration (Stage 1)
+- \[ \] `pikaraoke/lib/args.py` - Add `--dev-mode` flag (Stage 1)
+- \[ \] `pyproject.toml` - Add `sqlite-web` as dev dependency (Stage 1)
 - \[ \] `pikaraoke/karaoke.py` - Database initialization (Stage 2)
 - \[ \] `pikaraoke/templates/info.html` - Admin UI updates (Stage 3)
 - \[ \] Flask routes file - New admin endpoints (Stage 3)
@@ -437,6 +497,10 @@ ______________________________________________________________________
 
 - `{get_data_directory()}/pikaraoke.db` - Main database
 - `{get_data_directory()}/backups/*.db` - Backup snapshots
+
+### Development-Only Files (Not Deployed)
+
+- Development database viewer accessible at `/dev/database` (when `--dev-mode` is enabled)
 
 ______________________________________________________________________
 
@@ -453,6 +517,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-**Document Status:** Draft for Review
+**Document Status:** Updated with Development Tooling
 **Last Updated:** 2026-01-09
+**Last Change:** Added sqlite-web development database viewer for Stage 1
 **Next Review:** After user feedback
