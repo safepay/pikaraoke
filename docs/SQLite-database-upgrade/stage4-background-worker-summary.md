@@ -1,14 +1,14 @@
 # Stage 4: Background Worker & Confidence Scoring - Implementation Summary
 
 **Created:** 2026-01-09
-**Status:** ✅ Design Updated with Real-World YouTube Patterns & Hybrid API Strategy
+**Status:**  Design Updated with Real-World YouTube Patterns & Hybrid API Strategy
 **Last Updated:** 2026-01-09
 
 ______________________________________________________________________
 
 ## Key Changes Made
 
-### 1. Real-World YouTube Karaoke Pattern Analysis 🎯
+### 1. Real-World YouTube Karaoke Pattern Analysis
 
 **Discovery:** YouTube karaoke titles follow 5 distinct pattern categories, NOT just "Artist - Title":
 
@@ -21,11 +21,11 @@ ______________________________________________________________________
 
 **Impact:**
 
-- ✅ **25% of files have HIGH confidence** (0.85) artist extraction from copyright phrases
-- ✅ **95% of files contain artist** information (only 5% problematic)
-- ✅ **YouTube ID extraction** handles both `---ID` (PiKaraoke) and `[ID]` (standard yt-dlp)
+- **25% of files have HIGH confidence** (0.85) artist extraction from copyright phrases
+- **95% of files contain artist** information (only 5% problematic)
+- **YouTube ID extraction** handles both `---ID` (PiKaraoke) and `[ID]` (standard yt-dlp)
 
-### 2. Background Enrichment is NOW a Core Feature ⚡
+### 2. Background Enrichment is NOW a Core Feature
 
 **Previously:** Listed as "Improvement 2" (optional)
 **Now:** PRIMARY implementation approach (mandatory)
@@ -39,13 +39,13 @@ ______________________________________________________________________
 
 **Solution:** Dedicated `EnrichmentWorker` thread that:
 
-- ✅ Runs in background (daemon thread)
-- ✅ Respects API rate limits
-- ✅ Persists progress to database
-- ✅ Survives app restarts
-- ✅ Can be paused/resumed
-- ✅ Provides real-time progress updates
-- ✅ **NEW: Handles both LastFM fuzzy matching AND MusicBrainz precision**
+- Runs in background (daemon thread)
+- Respects API rate limits
+- Persists progress to database
+- Survives app restarts
+- Can be paused/resumed
+- Provides real-time progress updates
+- **NEW: Handles both LastFM fuzzy matching AND MusicBrainz precision**
 
 ______________________________________________________________________
 
@@ -72,14 +72,14 @@ CREATE TABLE songs (
 
 | Score | Status | Meaning | Pattern Example | UI Indicator |
 |-------|--------|---------|----------------|--------------|
-| 1.00 | manual | User edited | N/A | 🟢 "Verified" |
-| 0.90-0.99 | enriched | MusicBrainz validated | After API cross-check | 🟢 "High Confidence" |
-| 0.85 | parsed | **Copyright phrase (artist explicit)** | `(Originally Performed By Oasis)` | 🟢 "High Confidence" |
-| 0.70-0.84 | enriched | LastFM matched | API fuzzy match | 🟡 "Medium Confidence" |
-| 0.60-0.69 | parsed | Standard format (ambiguous) | `Artist - Title (Karaoke)` | 🟡 "Parsed" |
-| 0.40-0.59 | parsed | Weak separator | `Artist_Title` | 🟠 "Review Suggested" |
-| 0.20-0.39 | parsed | Fallback (title only) | `legacy_song` | 🔴 "Low Confidence" |
-| 0.00-0.19 | pending/failed | No metadata | Empty/failed parse | 🔴 "Needs Review" |
+| 1.00 | manual | User edited | N/A |  "Verified" |
+| 0.90-0.99 | enriched | MusicBrainz validated | After API cross-check |  "High Confidence" |
+| 0.85 | parsed | **Copyright phrase (artist explicit)** | `(Originally Performed By Oasis)` |  "High Confidence" |
+| 0.70-0.84 | enriched | LastFM matched | API fuzzy match |  "Medium Confidence" |
+| 0.60-0.69 | parsed | Standard format (ambiguous) | `Artist - Title (Karaoke)` |  "Parsed" |
+| 0.40-0.59 | parsed | Weak separator | `Artist_Title` |  "Review Suggested" |
+| 0.20-0.39 | parsed | Fallback (title only) | `legacy_song` |  "Low Confidence" |
+| 0.00-0.19 | pending/failed | No metadata | Empty/failed parse |  "Needs Review" |
 
 **Key Change:** Copyright phrases (`(Originally Performed By...)`) now generate **0.85 confidence** immediately during Phase 4A, reducing API calls needed!
 
@@ -103,7 +103,7 @@ CREATE TABLE enrichment_queue (
 
 **Benefits:**
 
-- Priority support (new uploads → high priority)
+- Priority support (new uploads -> high priority)
 - Prevents duplicate processing
 - Survives app restarts
 
@@ -118,12 +118,12 @@ CREATE TABLE enrichment_state (
 
 **Stores:**
 
-- `worker_running` → 'true'/'false'
-- `worker_paused` → 'true'/'false'
-- `worker_started_at` → ISO timestamp
-- `total_processed` → count
-- `total_enriched` → count
-- `total_failed` → count
+- `worker_running` -> 'true'/'false'
+- `worker_paused` -> 'true'/'false'
+- `worker_started_at` -> ISO timestamp
+- `total_processed` -> count
+- `total_enriched` -> count
+- `total_failed` -> count
 
 **Purpose:** Persist worker state across app restarts.
 
@@ -183,21 +183,20 @@ db.queue_for_enrichment(song_ids)  # Add songs to queue
 **UI Mock:**
 
 ```
-┌───────────────────────────────────────────────────┐
-│ 🎵 Metadata Enrichment                           │
-├───────────────────────────────────────────────────┤
-│                                                   │
-│ Status: Running ⚡                                │
-│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 247/1000 (24.7%) │
-│                                                   │
-│ Enriched: 180 | Failed: 67 | Remaining: 753     │
-│ Est. Time: 2h 5m (at 5 req/sec)                  │
-│                                                   │
-│ [⏸ Pause] [⏹ Stop]                                │
-│                                                   │
-│ 💡 Tip: Enrichment runs in background.           │
-│    You can use the app normally.                 │
-└───────────────────────────────────────────────────┘
+
+  Metadata Enrichment
+
+ Status: Running
+  247/1000 (24.7%)
+
+ Enriched: 180 | Failed: 67 | Remaining: 753
+ Est. Time: 2h 5m (at 5 req/sec)
+
+ [ Pause] [ Stop]
+
+  Tip: Enrichment runs in background.
+    You can use the app normally.
+
 ```
 
 ______________________________________________________________________
@@ -208,32 +207,32 @@ ______________________________________________________________________
 
 ```
 1. User scans library (Stage 2)
-   ↓
+
 2. Filenames parsed immediately (Phase 4A - synchronous)
-   ↓ Songs have: artist, title, confidence=0.4-0.6
-   ↓
+    Songs have: artist, title, confidence=0.4-0.6
+
 3. Songs added to enrichment_queue
-   ↓
+
 4. Background worker starts automatically (or manually via UI)
-   ↓
+
 5. Worker processes queue at 5 req/sec (Last.FM limit)
-   ↓ For each song:
-   ├─ Query Last.FM API for (artist, title)
-   ├─ If found: Update with year/genre/canonical names
-   │            confidence → 0.70-0.99
-   │            metadata_status → 'enriched'
-   ├─ If not found: Mark as 'enrichment_failed'
-   │                 confidence stays 0.4-0.6 (parsed)
-   └─ Remove from queue
-   ↓
+    For each song:
+    Query Last.FM API for (artist, title)
+    If found: Update with year/genre/canonical names
+               confidence -> 0.70-0.99
+               metadata_status -> 'enriched'
+    If not found: Mark as 'enrichment_failed'
+                    confidence stays 0.4-0.6 (parsed)
+    Remove from queue
+
 6. User can browse/search during enrichment (non-blocking)
-   ↓
+
 7. Low-confidence songs flagged in UI for manual review
-   ↓
+
 8. User edits metadata manually (Phase 4C)
-   ↓ confidence → 1.00 (manual)
-   ↓ metadata_status → 'manual'
-   ↓
+    confidence -> 1.00 (manual)
+    metadata_status -> 'manual'
+
 9. Search/browse use enriched metadata
 ```
 
@@ -247,10 +246,10 @@ ______________________________________________________________________
 
 **Why:**
 
-- ✅ No external dependencies (Celery requires Redis/RabbitMQ)
-- ✅ Simpler setup for users
-- ✅ Sufficient for single-instance apps
-- ✅ State persists to SQLite (survives restarts)
+- No external dependencies (Celery requires Redis/RabbitMQ)
+- Simpler setup for users
+- Sufficient for single-instance apps
+- State persists to SQLite (survives restarts)
 
 **Trade-off:** Won't scale to multiple workers/machines (not needed for PiKaraoke)
 
@@ -260,9 +259,9 @@ ______________________________________________________________________
 
 **Why:**
 
-- ✅ Allows concurrent reads while worker writes
-- ✅ Better crash recovery
-- ✅ Recommended for write-heavy workloads
+- Allows concurrent reads while worker writes
+- Better crash recovery
+- Recommended for write-heavy workloads
 
 **Result:** UI can browse songs while enrichment updates database.
 
@@ -272,10 +271,10 @@ ______________________________________________________________________
 
 **Why:**
 
-- ✅ Priority support (new uploads first)
-- ✅ Prevents duplicate processing
-- ✅ Survives app restarts (queue persists)
-- ✅ Can add manual re-queue feature
+- Priority support (new uploads first)
+- Prevents duplicate processing
+- Survives app restarts (queue persists)
+- Can add manual re-queue feature
 
 **Alternative:** Process all `metadata_status='parsed'` songs directly
 **Problem:** Can't track priority, harder to resume after restart
@@ -286,9 +285,9 @@ ______________________________________________________________________
 
 **Why:**
 
-- ✅ Temporary API failures shouldn't permanently fail songs
-- ✅ Prevents infinite retry loops
-- ✅ After 3 failures → mark as 'enrichment_failed'
+- Temporary API failures shouldn't permanently fail songs
+- Prevents infinite retry loops
+- After 3 failures -> mark as 'enrichment_failed'
 
 **User Override:** Failed songs can be manually edited or re-queued with high priority.
 
@@ -381,26 +380,26 @@ ______________________________________________________________________
 
 **Added:**
 
-1. ✅ `confidence` field with calculation logic
-2. ✅ `enrichment_attempts` and retry logic
-3. ✅ `enrichment_queue` table
-4. ✅ `enrichment_state` table
-5. ✅ Background worker thread
-6. ✅ Progress tracking
-7. ✅ Pause/resume functionality
+1. `confidence` field with calculation logic
+2. `enrichment_attempts` and retry logic
+3. `enrichment_queue` table
+4. `enrichment_state` table
+5. Background worker thread
+6. Progress tracking
+7. Pause/resume functionality
 
 **Fixed:**
 
-1. ✅ No longer blocks main thread
-2. ✅ Rate limiting built-in
-3. ✅ Survives app restarts
-4. ✅ User-visible progress
+1. No longer blocks main thread
+2. Rate limiting built-in
+3. Survives app restarts
+4. User-visible progress
 
 **Preserved:**
 
-1. ✅ Last.FM API integration approach
-2. ✅ Filename parsing patterns
-3. ✅ Metadata fields (artist, title, year, genre)
+1. Last.FM API integration approach
+2. Filename parsing patterns
+3. Metadata fields (artist, title, year, genre)
 
 ______________________________________________________________________
 
@@ -410,9 +409,9 @@ ______________________________________________________________________
 
 ```
 User adds 1000 songs
-  ↓
+
 App scans filenames (instant)
-  ↓
+
 Browse shows:
   - Artist: "Beatles" (from filename)
   - Title: "Hey Jude" (from filename)
@@ -425,14 +424,14 @@ Browse shows:
 
 ```
 User adds 1000 songs
-  ↓
+
 App scans filenames (instant)
-  ↓
+
 Background enrichment starts automatically
-  ↓ (User can browse/search immediately)
-  ↓
+   (User can browse/search immediately)
+
 3 minutes later (enrichment complete)
-  ↓
+
 Browse shows:
   - Artist: "The Beatles" (canonical from Last.FM)
   - Title: "Hey Jude"
@@ -441,7 +440,7 @@ Browse shows:
   - Confidence: 0.95 (green tag: "High Confidence")
 
 Low-confidence songs flagged:
-  🟠 "Review Suggested" → User can manually edit
+   "Review Suggested" -> User can manually edit
 ```
 
 ______________________________________________________________________
@@ -513,7 +512,7 @@ ______________________________________________________________________
 
 ## Summary
 
-### What Changed ✅
+### What Changed
 
 1. **Background worker** - Now CORE feature (was "improvement")
 2. **Confidence scoring** - Now built into schema (was "improvement")
@@ -522,7 +521,7 @@ ______________________________________________________________________
 5. **Progress tracking** - Real-time UI updates
 6. **Retry logic** - Max 3 attempts per song
 
-### Why It Matters 🎯
+### Why It Matters
 
 **Before:** Enrichment would block UI for hours
 **After:** App usable immediately, enrichment in background
@@ -533,7 +532,7 @@ ______________________________________________________________________
 **Before:** Lost progress on restart
 **After:** Resumes from where it left off
 
-### Implementation Complexity 📊
+### Implementation Complexity
 
 | Component | Lines of Code | Complexity |
 |-----------|---------------|------------|
@@ -547,7 +546,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## Existing UI Integration 🎨
+## Existing UI Integration
 
 **CRITICAL:** PiKaraoke already has a LastFM suggestion UI ([edit.html:72-97](pikaraoke/templates/edit.html#L72-L97)) that should be **preserved and enhanced**, not replaced.
 
@@ -567,23 +566,23 @@ ______________________________________________________________________
 
 **Benefits:**
 
-- ✅ Familiar UX for existing users
-- ✅ Less manual work (auto-populated fields)
-- ✅ Consistent parsing logic across app
-- ✅ Power users retain full control
+- Familiar UX for existing users
+- Less manual work (auto-populated fields)
+- Consistent parsing logic across app
+- Power users retain full control
 
 ______________________________________________________________________
 
 ## Next Steps
 
-1. ✅ Review updated Stage 4 document
-2. 📝 Approve background worker approach
-3. 📝 Approve confidence scoring design
-4. 📝 Approve existing UI enhancement approach
-5. 🚀 Begin implementation (after Stages 1-3)
+1. Review updated Stage 4 document
+2. Approve background worker approach
+3. Approve confidence scoring design
+4. Approve existing UI enhancement approach
+5. Begin implementation (after Stages 1-3)
 
 ______________________________________________________________________
 
-**Document Status:** ✅ Updated with Core Features
+**Document Status:**  Updated with Core Features
 **Last Updated:** 2026-01-09
 **Reviewed By:** Pending

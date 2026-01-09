@@ -1,7 +1,7 @@
 # Stage 4: Metadata Enrichment with Background Worker - Detailed Implementation Plan
 
 **Stage:** 4 of 4 (CRITICAL Enhancement - 99% Coverage Target)
-**Status:** 📋 Revised with Hybrid API Strategy & Artist-Title Resolution
+**Status:**  Revised with Hybrid API Strategy & Artist-Title Resolution
 **Prerequisites:** Stage 3 (Admin UI Complete)
 **Estimated Effort:** 3-4 days
 **Risk Level:** Medium
@@ -47,17 +47,17 @@ This revision addresses key limitations in the original plan:
 
 ### Three-Phase Approach (REVISED)
 
-1. **Get data into database** (Stages 1-3) ✅
+1. **Get data into database** (Stages 1-3)
 2. **Intelligent enrichment with hybrid API strategy** (Stage 4A-4B) - CRITICAL
 3. **Fallback to manual UI editor** for remaining edge cases (\< 1%) (Stage 4C)
 
 This is the **right approach** because:
 
-- ✅ Users can search immediately (even with basic filename data)
-- ✅ Background enrichment achieves 99%+ accuracy through hybrid API strategy
-- ✅ Artist-Title ordering resolved automatically via fuzzy matching
-- ✅ Manual editing required for \< 1% of songs (exceptional cases only)
-- ✅ Works out-of-box with hard-coded API key (no user setup friction)
+- Users can search immediately (even with basic filename data)
+- Background enrichment achieves 99%+ accuracy through hybrid API strategy
+- Artist-Title ordering resolved automatically via fuzzy matching
+- Manual editing required for \< 1% of songs (exceptional cases only)
+- Works out-of-box with hard-coded API key (no user setup friction)
 
 ______________________________________________________________________
 
@@ -77,10 +77,10 @@ ______________________________________________________________________
 
 **Issues:**
 
-- ❌ Can't browse by artist
-- ❌ Can't filter by genre/year
-- ❌ Search depends on exact filename match
-- ❌ No rich metadata for better UX
+- Can't browse by artist
+- Can't filter by genre/year
+- Search depends on exact filename match
+- No rich metadata for better UX
 
 ### Desired State (After Stage 4)
 
@@ -96,12 +96,12 @@ ______________________________________________________________________
 
 **Benefits:**
 
-- ✅ Browse by artist/genre/year
-- ✅ Better search (artist name, genre, etc.)
-- ✅ Rich UI (show album art, year, genre tags)
-- ✅ Confidence scores show data quality
-- ✅ Background enrichment doesn't block UI
-- ✅ Improved user experience
+- Browse by artist/genre/year
+- Better search (artist name, genre, etc.)
+- Rich UI (show album art, year, genre tags)
+- Confidence scores show data quality
+- Background enrichment doesn't block UI
+- Improved user experience
 
 ______________________________________________________________________
 
@@ -189,24 +189,24 @@ random_filename_123.zip
 1. **Extract YouTube ID** (before any parsing)
 2. **Strip karaoke markers**: "(Karaoke)", "(Karaoke Version)", "| Karaoke", "\[Karaoke\]"
 3. **Strip copyright phrases**: "(Originally Performed By...)", "(Made Famous By...)", "(In the Style of...)"
-4. **Extract artist from phrases**: "Originally Performed By Artist" → Artist: "Artist"
+4. **Extract artist from phrases**: "Originally Performed By Artist" -> Artist: "Artist"
 5. **Handle remaining ambiguity**: "Song - Artist" vs "Artist - Song"
 
 **Example parsing flow:**
 
 ```
 Input: "Wonderwall (Originally Performed By Oasis) [Karaoke]---vid123id456.mp4"
-  ↓ Extract YouTube ID
+   Extract YouTube ID
 YouTube ID: "vid123id456"
 Remaining: "Wonderwall (Originally Performed By Oasis) [Karaoke]"
-  ↓ Strip karaoke markers
+   Strip karaoke markers
 Remaining: "Wonderwall (Originally Performed By Oasis)"
-  ↓ Extract from copyright phrase
+   Extract from copyright phrase
 Artist: "Oasis"
 Title: "Wonderwall"
 Confidence: 0.85 (high - artist explicitly stated)
-  ↓ Phase 4B: Verify with LastFM
-LastFM confirms: Oasis - Wonderwall ✓
+   Phase 4B: Verify with LastFM
+LastFM confirms: Oasis - Wonderwall
 Confidence: 0.95
 ```
 
@@ -216,10 +216,10 @@ Based on analysis of top karaoke channels ([HitPaw research](https://online.hitp
 
 | Pattern Type | Percentage | Artist Present? | Parsing Difficulty |
 |--------------|------------|-----------------|-------------------|
-| Standard "Artist - Title (Karaoke)" | 60% | ✅ Yes (ambiguous order) | Medium |
-| Copyright avoidance phrases | 25% | ✅ Yes (in phrase) | Low (artist explicit) |
-| Instrumental/Backing | 10% | ✅ Yes | Low |
-| Legacy CDG/manual files | 5% | ⚠️ Maybe | High |
+| Standard "Artist - Title (Karaoke)" | 60% |  Yes (ambiguous order) | Medium |
+| Copyright avoidance phrases | 25% |  Yes (in phrase) | Low (artist explicit) |
+| Instrumental/Backing | 10% |  Yes | Low |
+| Legacy CDG/manual files | 5% |  Maybe | High |
 
 **Key Insight:** 95% of YouTube karaoke files contain artist information, but in varying formats. Only 5% are truly problematic.
 
@@ -251,23 +251,23 @@ Based on analysis of top karaoke channels ([HitPaw research](https://online.hitp
 
 ```
 Phase 1: Filename Parsing (Low Confidence)
-   ↓ Parse both orderings: "A - B" and "B - A"
-   ↓ Confidence: 0.30 (ambiguous)
-   ↓
+    Parse both orderings: "A - B" and "B - A"
+    Confidence: 0.30 (ambiguous)
+
 Phase 2: LastFM Fuzzy Resolution (Medium Confidence)
-   ↓ Try both orderings against LastFM API
-   ↓ track.search("Artist=A, Track=B") → Match Score: 0.85
-   ↓ track.search("Artist=B, Track=A") → Match Score: 0.42
-   ↓ Pick higher score → Resolves ordering ambiguity
-   ↓ Extract: canonical artist, canonical title, year, primary genre
-   ↓ Confidence: 0.75-0.85
-   ↓
+    Try both orderings against LastFM API
+    track.search("Artist=A, Track=B") -> Match Score: 0.85
+    track.search("Artist=B, Track=A") -> Match Score: 0.42
+    Pick higher score -> Resolves ordering ambiguity
+    Extract: canonical artist, canonical title, year, primary genre
+    Confidence: 0.75-0.85
+
 Phase 3: MusicBrainz Precision Enrichment (High Confidence)
-   ↓ Query MusicBrainz with resolved artist + title
-   ↓ Get: release year, full genre tags, album, MBID
-   ↓ Cross-validate with LastFM results
-   ↓ Confidence: 0.90-0.99
-   ↓
+    Query MusicBrainz with resolved artist + title
+    Get: release year, full genre tags, album, MBID
+    Cross-validate with LastFM results
+    Confidence: 0.90-0.99
+
 Result: 99% of songs accurately enriched
 ```
 
@@ -277,7 +277,7 @@ Result: 99% of songs accurately enriched
 
    - LastFM's `track.search` returns relevance scores
    - Try both orderings, pick the one with higher relevance
-   - Example: "Wonderwall - Oasis" → Try both → LastFM ranks "Oasis / Wonderwall" much higher
+   - Example: "Wonderwall - Oasis" -> Try both -> LastFM ranks "Oasis / Wonderwall" much higher
    - Ordering ambiguity solved without user intervention
 
 2. **MusicBrainz Provides Precision**
@@ -291,18 +291,26 @@ Result: 99% of songs accurately enriched
 
    - LastFM first (5 req/sec = 300/min = 18,000/hour)
    - Resolves 90-95% of songs quickly
-   - MusicBrainz second (1 req/sec = 60/min = 3,600/hour)
+   - MusicBrainz second (0.9 req/sec conservative = 54/min = 3,240/hour)
    - Fills gaps and enriches successfully matched songs
    - Combined: 99%+ success rate
+   - **Note:** MusicBrainz timing is conservative (1.1 sec intervals) to avoid HTTP 503
 
 #### API Selection Matrix
 
-| API | Rate Limit | Best For | Weaknesses |
-|-----|-----------|----------|------------|
-| **LastFM** | 5 req/sec | Fuzzy search, ordering resolution, popular music | Limited metadata depth, user-contributed genres (inconsistent) |
-| **MusicBrainz** | 1 req/sec | Structured data, comprehensive metadata, classical/world music | Slower, requires exact-ish matching, less fuzzy |
+| API | Rate Limit | Best For | Weaknesses | User-Agent Requirement |
+|-----|-----------|----------|------------|------------------------|
+| **LastFM** | 5 req/sec (per API key) | Fuzzy search, ordering resolution, popular music | Limited metadata depth, user-contributed genres (inconsistent) | Optional (but recommended) |
+| **MusicBrainz** | **1 req/sec PER IP** (strictly enforced, all-or-nothing) | Structured data, comprehensive metadata, classical/world music | **VERY SLOW**, requires exact-ish matching, less fuzzy, **HTTP 503 if exceeded** | **MANDATORY** (proper format required) |
 
-**Decision:** Use BOTH in sequence for maximum coverage and accuracy.
+**Critical MusicBrainz Constraints:**
+
+1. **Conservative rate limiting required:** Use 0.9 req/sec (or 1.1 sec intervals) instead of exactly 1.0 req/sec
+2. **All-or-nothing enforcement:** When rate is exceeded, ALL subsequent requests fail with HTTP 503 (not just excess requests)
+3. **User-Agent format:** MUST be `AppName/Version ( contact )` - anonymous agents get throttled to 50 req/sec shared pool
+4. **No bursting:** Unlike token bucket systems, MusicBrainz doesn't allow temporary bursts
+
+**Decision:** Use BOTH in sequence for maximum coverage and accuracy, with LastFM first (faster) and MusicBrainz second (precision enrichment).
 
 #### Hard-Coded API Key Approach (Interim)
 
@@ -312,6 +320,9 @@ Result: 99% of songs accurately enriched
 # In pikaraoke/lib/config.py
 
 DEFAULT_LASTFM_API_KEY = "abc123..."  # Hard-coded key (included in repo)
+
+# CRITICAL: MusicBrainz User-Agent MUST follow format: "AppName/Version ( contact )"
+# Bad user agents (Python-urllib, etc.) get throttled to 50 req/sec GLOBALLY SHARED
 DEFAULT_MUSICBRAINZ_USER_AGENT = "PiKaraoke/1.0 (https://github.com/vicwomg/pikaraoke)"
 
 
@@ -321,87 +332,118 @@ def get_lastfm_api_key() -> str:
 
 
 def get_musicbrainz_user_agent() -> str:
-    """Get MusicBrainz user agent (env override or default)."""
-    return os.getenv("MUSICBRAINZ_USER_AGENT", DEFAULT_MUSICBRAINZ_USER_AGENT)
+    """Get MusicBrainz user agent (env override or default).
+
+    CRITICAL: MusicBrainz requires properly formatted User-Agent headers.
+    Format: "AppName/Version ( contact-url-or-email )"
+
+    Anonymous/generic user agents like "Python-urllib" are throttled to a
+    shared 50 req/sec pool across ALL users, making enrichment unreliable.
+
+    Returns:
+        Properly formatted User-Agent string for MusicBrainz API
+    """
+    user_agent = os.getenv("MUSICBRAINZ_USER_AGENT", DEFAULT_MUSICBRAINZ_USER_AGENT)
+
+    # Validate format (basic check)
+    if not user_agent or "(" not in user_agent or ")" not in user_agent:
+        logging.warning(
+            f"MusicBrainz User-Agent '{user_agent}' doesn't follow required format. "
+            "Using default."
+        )
+        return DEFAULT_MUSICBRAINZ_USER_AGENT
+
+    return user_agent
 ```
 
 **Why Hard-Code:**
 
-- ✅ Zero user setup friction (works out-of-box)
-- ✅ Most users won't hit API rate limits (5 req/sec is generous for personal use)
-- ✅ Users can override via environment variable if needed
-- ✅ Future enhancement: user accounts with their own keys (NOT NOW)
+- Zero user setup friction (works out-of-box)
+- Most users won't hit API rate limits (5 req/sec is generous for personal use)
+- Users can override via environment variable if needed
+- Future enhancement: user accounts with their own keys (NOT NOW)
 
 **Rate Limit Management:**
 
 ```python
-# Shared API key rate limiting
+# Shared API key rate limiting (conservative estimates)
 # If user has 10K songs and runs enrichment:
-# - LastFM: 10,000 / 5 req/sec = 33 minutes
-# - MusicBrainz: 10,000 / 1 req/sec = 2.8 hours
-# Total: ~3 hours (background worker, non-blocking)
+# - LastFM: 10,000 / 5 req/sec = 33 minutes (2,000 seconds)
+# - MusicBrainz: 10,000 / 0.9 req/sec = 3.1 hours (11,111 seconds)
+#   (Using conservative 0.9 req/sec instead of 1.0 to avoid HTTP 503)
+# Total: ~3.6 hours (background worker, non-blocking)
+#
+# IMPORTANT: MusicBrainz uses IP-based rate limiting
+# - If multiple PiKaraoke instances on same network, they share 1 req/sec limit
+# - Exceeding rate = ALL requests fail with HTTP 503 (not just excess)
+# - Use 1.1 second intervals (0.9 req/sec) for safety margin
 ```
 
 **Fair Use Policy:**
 
 - Application enforces rate limits strictly (never exceeds API terms)
-- Background worker respects `Retry-After` headers
+- Background worker respects `Retry-After` headers (and HTTP 503 responses)
 - Users enriching 100K+ song libraries should use their own keys
+
+**MusicBrainz Best Practices (per official documentation):**
+
+1. **Avoid synchronized requests:** Don't schedule enrichment at fixed times (e.g., midnight) that could create global traffic spikes
+2. **Randomize scheduling:** If implementing scheduled enrichment, add random jitter to avoid coordination with other PiKaraoke instances
+3. **Don't poll continuously:** Never implement "check for metadata updates" loops that continuously query the API
+4. **Handle HTTP 503 gracefully:** When rate limit is exceeded, back off exponentially (5 sec, 10 sec, 20 sec) before retrying
+5. **Network consideration:** Multiple PiKaraoke instances behind same NAT/proxy SHARE the 1 req/sec IP limit
 
 ______________________________________________________________________
 
 ## Architecture: Background Enrichment Pipeline
 
-### Core Principle: Non-Blocking Enrichment ⚡
+### Core Principle: Non-Blocking Enrichment
 
 **Critical Design Decision:** Enrichment happens in a **background worker thread** that never blocks the main application.
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Main Application                     │
-│  ┌─────────────┐    ┌──────────────┐                   │
-│  │   Browse    │    │    Search    │  ← Users can use  │
-│  │   Songs     │    │    Songs     │    app immediately │
-│  └─────────────┘    └──────────────┘                   │
-└─────────────────────────────────────────────────────────┘
-                           ↑
-                           │ Non-blocking reads
-                           │
-┌──────────────────────────┴──────────────────────────────┐
-│              SQLite Database (WAL mode)                 │
-│  Songs with partial metadata (filename-parsed only)     │
-└──────────────────────────┬──────────────────────────────┘
-                           ↑
-                           │ Background writes
-                           │
-┌──────────────────────────┴──────────────────────────────┐
-│            Background Enrichment Worker Thread          │
-│  ┌──────────────┐   ┌──────────────┐   ┌────────────┐ │
-│  │   Filename   │ → │ LastFM Fuzzy │ → │ MusicBrainz │ │
-│  │   Parser     │   │   Resolution │   │  Enrichment │ │
-│  │  (instant)   │   │ (5 req/sec)  │   │ (1 req/sec) │ │
-│  │  both A-B    │   │  Try both    │   │  Validate & │ │
-│  │  and B-A     │   │  orderings   │   │  Enrich     │ │
-│  └──────────────┘   └──────────────┘   └────────────┘ │
-│        ↓                   ↓                   ↓        │
-│   Confidence: 0.30    Confidence: 0.80    Confidence:  │
-│                                             0.95        │
-│                                                         │
-│  Progress: 247/1000 → 99% accurately enriched          │
-└─────────────────────────────────────────────────────────┘
+
+                    Main Application
+
+     Browse            Search      <- Users can use
+     Songs             Songs         app immediately
+
+
+                            Non-blocking reads
+
+              SQLite Database (WAL mode)
+  Songs with partial metadata (filename-parsed only)
+
+
+                            Background writes
+
+            Background Enrichment Worker Thread
+
+     Filename    ->  LastFM Fuzzy  ->  MusicBrainz
+     Parser           Resolution      Enrichment
+    (instant)       (5 req/sec)      (1 req/sec)
+    both A-B         Try both         Validate &
+    and B-A          orderings        Enrich
+
+
+   Confidence: 0.30    Confidence: 0.80    Confidence:
+                                             0.95
+
+  Progress: 247/1000 -> 99% accurately enriched
+
 ```
 
 **Key Benefits:**
 
-- ✅ App starts immediately (no waiting for enrichment)
-- ✅ Users can search/browse while enrichment runs
-- ✅ Artist-Title ordering resolved automatically via fuzzy matching
-- ✅ 99%+ accuracy through hybrid LastFM + MusicBrainz strategy
-- ✅ Rate limiting handled in background (no UI freezes)
-- ✅ Progress tracked and displayed in admin UI
-- ✅ Can pause/resume enrichment
-- ✅ Survives app restarts (tracks progress in DB)
-- ✅ Works out-of-box (hard-coded API key, user override available)
+- App starts immediately (no waiting for enrichment)
+- Users can search/browse while enrichment runs
+- Artist-Title ordering resolved automatically via fuzzy matching
+- 99%+ accuracy through hybrid LastFM + MusicBrainz strategy
+- Rate limiting handled in background (no UI freezes)
+- Progress tracked and displayed in admin UI
+- Can pause/resume enrichment
+- Survives app restarts (tracks progress in DB)
+- Works out-of-box (hard-coded API key, user override available)
 
 ______________________________________________________________________
 
@@ -457,11 +499,11 @@ CREATE TABLE IF NOT EXISTS enrichment_state (
 );
 
 -- Example state values:
--- 'worker_running' → 'true'/'false'
--- 'worker_started_at' → ISO timestamp
--- 'total_processed' → count
--- 'total_enriched' → count
--- 'total_failed' → count
+-- 'worker_running' -> 'true'/'false'
+-- 'worker_started_at' -> ISO timestamp
+-- 'total_processed' -> count
+-- 'total_enriched' -> count
+-- 'total_failed' -> count
 ```
 
 ### Confidence Score Calculation
@@ -470,13 +512,13 @@ CREATE TABLE IF NOT EXISTS enrichment_state (
 
 | Score Range | Status | Meaning | Color |
 |-------------|--------|---------|-------|
-| 1.00 | `manual` | User manually edited | 🟢 Green |
-| 0.90-0.99 | `enriched` | External API returned data + filename matched pattern | 🟢 Green |
-| 0.70-0.89 | `enriched` | External API returned data but filename didn't match pattern well | 🟡 Yellow |
-| 0.50-0.69 | `parsed` | Filename matched strong pattern (e.g., "Artist - Title") | 🟡 Yellow |
-| 0.30-0.49 | `parsed` | Filename matched weak pattern (e.g., underscores) | 🟠 Orange |
-| 0.10-0.29 | `parsed` | Fallback to filename as title only | 🔴 Red |
-| 0.00-0.09 | `pending`/`failed` | No metadata extracted | 🔴 Red |
+| 1.00 | `manual` | User manually edited |  Green |
+| 0.90-0.99 | `enriched` | External API returned data + filename matched pattern |  Green |
+| 0.70-0.89 | `enriched` | External API returned data but filename didn't match pattern well |  Yellow |
+| 0.50-0.69 | `parsed` | Filename matched strong pattern (e.g., "Artist - Title") |  Yellow |
+| 0.30-0.49 | `parsed` | Filename matched weak pattern (e.g., underscores) |  Orange |
+| 0.10-0.29 | `parsed` | Fallback to filename as title only |  Red |
+| 0.00-0.09 | `pending`/`failed` | No metadata extracted |  Red |
 
 **Calculation Logic:**
 
@@ -522,7 +564,7 @@ ______________________________________________________________________
 
 ## Proposed Three-Phase Approach
 
-### Phase 4A: Ambiguity-Aware Filename Parsing ⭐ START HERE
+### Phase 4A: Ambiguity-Aware Filename Parsing  START HERE
 
 **Risk:** Low
 **Impact:** Medium (provides baseline for Phase 4B)
@@ -552,9 +594,9 @@ PARSING_STAGES = [
     # PiKaraoke format: "Title---YouTubeID.ext"
     # Standard yt-dlp: "Title [YouTubeID].ext"
     # Stage 2: Extract artist from copyright phrases (high confidence)
-    # "Title (Originally Performed By Artist)" → Artist: "Artist", Title: "Title"
-    # "Title (Made Famous By Artist)" → Artist: "Artist", Title: "Title"
-    # "Title (In the Style of Artist)" → Artist: "Artist", Title: "Title"
+    # "Title (Originally Performed By Artist)" -> Artist: "Artist", Title: "Title"
+    # "Title (Made Famous By Artist)" -> Artist: "Artist", Title: "Title"
+    # "Title (In the Style of Artist)" -> Artist: "Artist", Title: "Title"
     # Stage 3: Strip karaoke markers (preparation for Stage 4)
     # "(Karaoke)", "(Karaoke Version)", "| Karaoke", "[Karaoke]", etc.
     # Stage 4: Parse remaining with ambiguity detection
@@ -831,21 +873,21 @@ def enrich_from_filenames(self):
 
 **Advantages:**
 
-- ✅ Fast (regex parsing is instant)
-- ✅ No external API calls
-- ✅ Works offline
-- ✅ No rate limiting
-- ✅ Handles 80% of well-named files
+- Fast (regex parsing is instant)
+- No external API calls
+- Works offline
+- No rate limiting
+- Handles 80% of well-named files
 
 **Disadvantages:**
 
-- ❌ Doesn't get year/genre (only what's in filename)
-- ❌ Can't correct misspellings
-- ❌ Artist names may be incomplete ("Beatles" vs "The Beatles")
+- Doesn't get year/genre (only what's in filename)
+- Can't correct misspellings
+- Artist names may be incomplete ("Beatles" vs "The Beatles")
 
 ______________________________________________________________________
 
-### Phase 4B: External API Enrichment ⚠️ PROCEED WITH CAUTION
+### Phase 4B: External API Enrichment  PROCEED WITH CAUTION
 
 **Risk:** Medium
 **Impact:** High
@@ -853,17 +895,17 @@ ______________________________________________________________________
 
 **Goal:** Fetch year, genre, and canonical artist/title from external APIs.
 
-#### Option 1: Last.FM API ⭐ RECOMMENDED
+#### Option 1: Last.FM API  RECOMMENDED
 
 **Why Last.FM?**
 
-- ✅ Free tier available (non-commercial use)
-- ✅ Extensive music database
-- ✅ Good artist/track info
-- ✅ Genre tags (user-contributed)
-- ✅ Album artwork URLs
-- ❌ Rate limit: 5 requests/second
-- ❌ Requires API key (users must sign up)
+- Free tier available (non-commercial use)
+- Extensive music database
+- Good artist/track info
+- Genre tags (user-contributed)
+- Album artwork URLs
+- Rate limit: 5 requests/second
+- Requires API key (users must sign up)
 
 **API Endpoints:**
 
@@ -1114,30 +1156,130 @@ def enrich_from_lastfm(self, api_key: str, batch_size: int = 100):
 
 **Why MusicBrainz?**
 
-- ✅ Completely free and open
-- ✅ No API key required
-- ✅ Comprehensive database
-- ✅ High data quality
-- ❌ Rate limit: 1 request/second (very slow)
-- ❌ More complex API
+- Completely free and open
+- No API key required
+- Comprehensive database
+- High data quality
+- **Rate limit: 1 request/second PER IP ADDRESS (strictly enforced)**
+- **CRITICAL: Requires proper User-Agent header or gets throttled to 50 req/sec globally**
+- More complex API
 
-**Recommendation:** Use Last.FM for speed, fall back to MusicBrainz if Last.FM fails.
+**Rate Limiting Details:**
+
+- **Per-IP enforcement:** 1 request/second average per IP address
+- **All-or-nothing enforcement:** When exceeded, ALL requests return HTTP 503 (not just excess requests)
+- **User-Agent MANDATORY:** Must use format `AppName/Version ( contact-url-or-email )`
+  - Good: `PiKaraoke/1.0 (https://github.com/vicwomg/pikaraoke)`
+  - Bad: `Python-urllib/3.9` (gets throttled to stricter 50 req/sec global pool)
+
+**Implementation Requirements:**
+
+```python
+class MusicBrainzEnricher:
+    """Enrich metadata using MusicBrainz API with strict rate limiting."""
+
+    API_BASE = "https://musicbrainz.org/ws/2/"
+    RATE_LIMIT = 0.9  # Conservative: 0.9 req/sec (not 1.0) to avoid HTTP 503
+    USER_AGENT = "PiKaraoke/1.0 (https://github.com/vicwomg/pikaraoke)"
+
+    def __init__(self):
+        self.last_request_time = 0
+        self.session = requests.Session()
+        self.session.headers.update({"User-Agent": self.USER_AGENT})
+
+    def _rate_limit(self):
+        """Enforce CONSERVATIVE rate limiting to avoid HTTP 503."""
+        now = time.time()
+        elapsed = now - self.last_request_time
+        # Use 1.1 seconds minimum interval (conservative, not 1.0)
+        min_interval = 1.1
+
+        if elapsed < min_interval:
+            time.sleep(min_interval - elapsed)
+
+        self.last_request_time = time.time()
+
+    def get_recording_info(
+        self, artist: str, title: str, retry_on_503: bool = True
+    ) -> dict | None:
+        """Fetch recording metadata from MusicBrainz.
+
+        Args:
+            artist: Artist name
+            title: Recording title
+            retry_on_503: If True, retry once after exponential backoff on HTTP 503
+
+        Returns:
+            Dict with metadata or None if not found
+        """
+        self._rate_limit()
+
+        try:
+            # Search for recording
+            response = self.session.get(
+                f"{self.API_BASE}recording/",
+                params={
+                    "query": f'artist:"{artist}" AND recording:"{title}"',
+                    "fmt": "json",
+                    "limit": 5,
+                },
+                timeout=10,
+            )
+
+            if response.status_code == 503:
+                # Rate limit exceeded - back off
+                logging.warning(
+                    "MusicBrainz rate limit exceeded (HTTP 503), backing off"
+                )
+                if retry_on_503:
+                    time.sleep(5.0)  # Wait 5 seconds before retry
+                    return self.get_recording_info(artist, title, retry_on_503=False)
+                return None
+
+            if response.status_code != 200:
+                logging.warning(f"MusicBrainz API error: {response.status_code}")
+                return None
+
+            data = response.json()
+
+            if not data.get("recordings"):
+                logging.debug(f"Recording not found: {artist} - {title}")
+                return None
+
+            # Use first result (best match)
+            recording = data["recordings"][0]
+
+            return {
+                "canonical_artist": recording.get("artist-credit", [{}])[0]
+                .get("artist", {})
+                .get("name"),
+                "canonical_title": recording.get("title"),
+                "year": recording.get("first-release-date", "")[:4] or None,
+                "mbid": recording.get("id"),
+            }
+
+        except requests.RequestException as e:
+            logging.error(f"MusicBrainz request failed: {e}")
+            return None
+```
+
+**Recommendation:** Use Last.FM for speed (5 req/sec), fall back to MusicBrainz (1 req/sec) for additional enrichment or verification.
 
 #### Option 3: Spotify Web API (Not Recommended)
 
 **Why Not Spotify?**
 
-- ❌ Requires OAuth authentication (complex setup)
-- ❌ Designed for streaming, not metadata lookup
-- ❌ Terms of Service restrict metadata scraping
-- ✅ Excellent data quality
-- ✅ Rich preview/artwork
+- Requires OAuth authentication (complex setup)
+- Designed for streaming, not metadata lookup
+- Terms of Service restrict metadata scraping
+- Excellent data quality
+- Rich preview/artwork
 
 **Verdict:** Too complex for this use case.
 
 ______________________________________________________________________
 
-### Phase 4C: Enhanced Manual UI Editor 🛠️ ESSENTIAL FALLBACK
+### Phase 4C: Enhanced Manual UI Editor  ESSENTIAL FALLBACK
 
 **Risk:** Low
 **Impact:** Medium
@@ -1153,9 +1295,9 @@ ______________________________________________________________________
 
 The existing UI provides:
 
-- ✅ **Auto-format button** - Strips karaoke markers from filename
-- ✅ **Swap artist/song order** - Reverses "Artist - Title" to "Title - Artist"
-- ✅ **Suggest from Last.fm** - Queries LastFM API and presents 5 suggestions
+- **Auto-format button** - Strips karaoke markers from filename
+- **Swap artist/song order** - Reverses "Artist - Title" to "Title - Artist"
+- **Suggest from Last.fm** - Queries LastFM API and presents 5 suggestions
 
 **Current `clean_title()` Function** ([edit.html:41-70](pikaraoke/templates/edit.html#L41-L70)):
 
@@ -1183,19 +1325,19 @@ function clean_title(search_str, title_case = false) {
 **Enhanced Flow:**
 
 ```
-User clicks "Edit" on song → Edit page loads
-  ↓
+User clicks "Edit" on song -> Edit page loads
+
 Backend: Parse filename with YouTubeKaraokeMetadataParser
-  ↓ Returns: artist="Oasis", title="Wonderwall", confidence=0.60
-  ↓
+   Returns: artist="Oasis", title="Wonderwall", confidence=0.60
+
 Frontend: Pre-populate form fields
-  ↓
+
 Display: "Artist: Oasis | Title: Wonderwall | Confidence: 60% (Medium)"
-  ↓
+
 Automatically call LastFM API with parsed values
-  ↓
+
 Display suggestions: [Oasis - Wonderwall, Oasis - Wonderwall (Remastered), ...]
-  ↓
+
 User selects suggestion OR manually edits OR clicks "Suggest again"
 ```
 
@@ -1230,10 +1372,10 @@ $(function() {
 
 **Benefits:**
 
-- ✅ **Preserves existing UX** - Users familiar with current UI see improvements, not changes
-- ✅ **Reduces manual work** - Auto-populates based on intelligent parsing
-- ✅ **Reuses parsing logic** - Same `YouTubeKaraokeMetadataParser` used everywhere
-- ✅ **Still allows manual override** - Power users can edit/re-search as needed
+- **Preserves existing UX** - Users familiar with current UI see improvements, not changes
+- **Reduces manual work** - Auto-populates based on intelligent parsing
+- **Reuses parsing logic** - Same `YouTubeKaraokeMetadataParser` used everywhere
+- **Still allows manual override** - Power users can edit/re-search as needed
 
 #### Use Cases for Manual Editing
 
@@ -1250,24 +1392,19 @@ $(function() {
 **Modal Layout:**
 
 ```
-┌───────────────────────────────────────────────────┐
-│ ✏️ Edit Song Metadata                        [X] │
-├───────────────────────────────────────────────────┤
-│                                                   │
-│ Filename: Beatles - Hey Jude.mp4                │
-│ ─────────────────────────────────────────────     │
-│                                                   │
-│ Artist:  [The Beatles____________]              │
-│ Title:   [Hey Jude________________]              │
-│ Year:    [1968____] (optional)                   │
-│ Genre:   [Rock____] (optional)                   │
-│ Variant: [________] (e.g., "Karaoke", "Live")   │
-│                                                   │
-│ ─────────────────────────────────────────────     │
-│                                                   │
-│ [Reset to Filename] [Cancel]     [Save Changes] │
-│                                                   │
-└───────────────────────────────────────────────────┘
+
+  Edit Song Metadata                        [X]
+
+ Filename: Beatles - Hey Jude.mp4
+
+ Artist:  [The Beatles____________]
+ Title:   [Hey Jude________________]
+ Year:    [1968____] (optional)
+ Genre:   [Rock____] (optional)
+ Variant: [________] (e.g., "Karaoke", "Live")
+
+ [Reset to Filename] [Cancel]     [Save Changes]
+
 ```
 
 **Implementation (Template):**
@@ -1278,7 +1415,7 @@ $(function() {
     <div class="modal-background"></div>
     <div class="modal-card">
         <header class="modal-card-head">
-            <p class="modal-card-title">✏️ {% trans %}Edit Song Metadata{% endtrans %}</p>
+            <p class="modal-card-title"> {% trans %}Edit Song Metadata{% endtrans %}</p>
             <button class="delete" aria-label="close"></button>
         </header>
         <section class="modal-card-body">
@@ -1475,7 +1612,7 @@ ______________________________________________________________________
 
 ## Better Approaches & Optimizations
 
-### Improvement 1: Hybrid Confidence Scoring ⭐ RECOMMENDED
+### Improvement 1: Hybrid Confidence Scoring  RECOMMENDED
 
 **Problem:** Sometimes external APIs return wrong data (e.g., cover song by different artist).
 
@@ -1495,21 +1632,21 @@ metadata_status VALUES:
 **UI Indicator:**
 
 ```html
-<span class="tag is-success">✓ High Confidence</span>
+<span class="tag is-success"> High Confidence</span>
 <span class="tag is-warning">? Low Confidence - Review Suggested</span>
-<span class="tag is-info">✏️ Manually Edited</span>
+<span class="tag is-info"> Manually Edited</span>
 ```
 
-### CORE FEATURE: Background Enrichment Worker ⚡
+### CORE FEATURE: Background Enrichment Worker
 
 **This is NOT optional - it's the PRIMARY implementation approach.**
 
 **Why Background Processing is Essential:**
 
-- ⏱️ Last.FM rate limit: 5 requests/second = 12 seconds/minute = 720 songs/hour
-- ⏱️ MusicBrainz rate limit: 1 request/second = 60 songs/minute = 3,600 songs/hour
-- 🚫 **Blocking the main thread for 10K songs = 4-14 hours of UI freeze**
-- ✅ Background worker = app usable immediately
+- ⏱ Last.FM rate limit: 5 requests/second = 12 seconds/minute = 720 songs/hour
+- ⏱ MusicBrainz rate limit: 1 request/second = 60 songs/minute = 3,600 songs/hour
+- **Blocking the main thread for 10K songs = 4-14 hours of UI freeze**
+- Background worker = app usable immediately
 
 **Full Implementation:**
 
@@ -1887,7 +2024,7 @@ class KaraokeDatabase:
 
 ```html
 <div id="enrichment-status" class="box">
-    <h5>🎵 Metadata Enrichment</h5>
+    <h5> Metadata Enrichment</h5>
     <p>Fetching year/genre data from Last.FM...</p>
 
     <progress class="progress is-primary"
@@ -2054,17 +2191,17 @@ def get_track_info_cached(self, artist: str, title: str) -> dict | None:
 
 **Benefits:**
 
-- ✅ Speeds up re-scans (no API calls for existing songs)
-- ✅ Reduces API usage (prevents duplicate lookups)
-- ✅ Works offline after initial enrichment
+- Speeds up re-scans (no API calls for existing songs)
+- Reduces API usage (prevents duplicate lookups)
+- Works offline after initial enrichment
 
-### Improvement 5: User-Contributed Database ⭐ FUTURE IDEA
+### Improvement 5: User-Contributed Database  FUTURE IDEA
 
-**Concept:** Build a community database of karaoke filenames → metadata mappings.
+**Concept:** Build a community database of karaoke filenames -> metadata mappings.
 
 **How it Works:**
 
-1. Users opt-in to share anonymized filename → metadata mappings
+1. Users opt-in to share anonymized filename -> metadata mappings
 2. Server collects mappings from all users
 3. Before calling external API, check community database first
 4. 80% cache hit rate (most karaoke files have common names)
@@ -2081,7 +2218,7 @@ ______________________________________________________________________
 
 ## Recommended Phased Rollout
 
-### Phase 4A: Filename Parsing ONLY ⭐ START HERE
+### Phase 4A: Filename Parsing ONLY  START HERE
 
 **Effort:** 1 day
 **Risk:** Low
@@ -2147,7 +2284,7 @@ ______________________________________________________________________
 ```html
 <div class="card">
     <header class="card-header">
-        <p class="card-header-title">📁 Browse by Artist</p>
+        <p class="card-header-title"> Browse by Artist</p>
     </header>
     <div class="card-content">
         <div class="list">
@@ -2239,7 +2376,7 @@ ______________________________________________________________________
 
 ## Final Recommendations
 
-### ✅ Recommended Approach (Best Balance)
+### Recommended Approach (Best Balance)
 
 1. **Phase 4A (Essential):** Implement filename parsing
 
@@ -2259,14 +2396,14 @@ ______________________________________________________________________
    - Requires API key setup
    - Adds complexity
 
-### ❌ What NOT to Do
+### What NOT to Do
 
 1. **Don't build your own AI model** - Overkill for this use case
 2. **Don't scrape websites** - Legal/ethical issues
 3. **Don't block startup on enrichment** - Always allow skipping
 4. **Don't auto-overwrite manual edits** - Preserve user intent
 
-### 🎯 Success Metrics
+### Success Metrics
 
 | Metric | Target | How to Measure |
 |--------|--------|----------------|
@@ -2277,7 +2414,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## Summary: Your Analysis is Correct ✅
+## Summary: Your Analysis is Correct
 
 **Your understanding:**
 
@@ -2285,18 +2422,18 @@ ______________________________________________________________________
 
 **Why this is the RIGHT approach:**
 
-1. ✅ **Progressive enhancement** - Each phase adds value independently
-2. ✅ **Non-blocking** - Users can search immediately, enrichment happens in background
-3. ✅ **Graceful degradation** - If enrichment fails, fallback to parsed data, then fallback to manual edit
-4. ✅ **User control** - Manual editor empowers users to fix edge cases
-5. ✅ **Pragmatic** - Balances automation with practicality
+1. **Progressive enhancement** - Each phase adds value independently
+2. **Non-blocking** - Users can search immediately, enrichment happens in background
+3. **Graceful degradation** - If enrichment fails, fallback to parsed data, then fallback to manual edit
+4. **User control** - Manual editor empowers users to fix edge cases
+5. **Pragmatic** - Balances automation with practicality
 
 **What could be better:**
 
-1. ⭐ **Add confidence scoring** - Let users know which metadata might be wrong
-2. ⭐ **Add caching layer** - Reduce API calls for common songs
-3. ⭐ **Add background worker with progress** - Better UX for long enrichment
-4. ⭐ **Start with Phase 4A only** - Defer external APIs until users request it
+1. **Add confidence scoring** - Let users know which metadata might be wrong
+2. **Add caching layer** - Reduce API calls for common songs
+3. **Add background worker with progress** - Better UX for long enrichment
+4. **Start with Phase 4A only** - Defer external APIs until users request it
 
 **Final Verdict:** Proceed with your plan, but start small (Phase 4A), validate, then expand to 4B/4C as needed.
 

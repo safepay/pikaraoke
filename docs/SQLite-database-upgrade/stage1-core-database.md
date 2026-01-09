@@ -1,7 +1,7 @@
 # Stage 1: Core Database Layer - Detailed Implementation Plan
 
 **Stage:** 1 of 4
-**Status:** 📋 Ready for Implementation
+**Status:**  Ready for Implementation
 **Prerequisites:** Stage 0 (Complete)
 **Estimated Effort:** 1-2 days
 **Risk Level:** Low
@@ -287,10 +287,10 @@ def scan_library(self, songs_dir: str) -> dict[str, int]:
 
 **Key Fixes from Reference Implementation:**
 
-1. ✅ Properly handles files without hashes (don't leave orphaned)
-2. ✅ Tracks which new paths are moves (prevents double-counting)
-3. ✅ Deletes unmoved missing files
-4. ✅ Uses SHA256 instead of MD5
+1. Properly handles files without hashes (don't leave orphaned)
+2. Tracks which new paths are moves (prevents double-counting)
+3. Deletes unmoved missing files
+4. Uses SHA256 instead of MD5
 
 ### Search Blob Population
 
@@ -708,11 +708,11 @@ ______________________________________________________________________
 
 After Stage 1 completion:
 
-1. ✅ All unit tests pass
-2. ✅ Code review completed
-3. ✅ Performance benchmarks met
-4. ✅ Documentation complete
-5. 📝 Proceed to Stage 2 (App Integration)
+1. All unit tests pass
+2. Code review completed
+3. Performance benchmarks met
+4. Documentation complete
+5. Proceed to Stage 2 (App Integration)
 
 ______________________________________________________________________
 

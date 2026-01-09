@@ -1,7 +1,7 @@
 # Database Upgrade to SQLite - STAGE 0 Analysis
 
 **Date:** 2026-01-09
-**Status:** ✅ COMPLETE
+**Status:**  COMPLETE
 **Next Stage:** STAGE 1 - Core Database & Sync Implementation
 
 ______________________________________________________________________
@@ -116,14 +116,14 @@ def get_data_directory() -> str:
 
 ```
 ~/.pikaraoke/                      # Or %APPDATA%\pikaraoke on Windows
-├── pikaraoke.db                   # Main SQLite database file
-├── pikaraoke.db-wal               # Write-Ahead Log (auto-created by SQLite)
-├── pikaraoke.db-shm               # Shared memory file (auto-created by SQLite)
-├── backups/                       # Temporary storage for backup downloads
-│   ├── pikaraoke_backup_20260109_143022.db
-│   └── pikaraoke_backup_20260109_150000.db
-├── config.ini                     # ✅ Already uses this location
-└── qrcode.png                     # ✅ Already uses this location
+ pikaraoke.db                   # Main SQLite database file
+ pikaraoke.db-wal               # Write-Ahead Log (auto-created by SQLite)
+ pikaraoke.db-shm               # Shared memory file (auto-created by SQLite)
+ backups/                       # Temporary storage for backup downloads
+    pikaraoke_backup_20260109_143022.db
+    pikaraoke_backup_20260109_150000.db
+ config.ini                     #  Already uses this location
+ qrcode.png                     #  Already uses this location
 ```
 
 ### File Specifications
@@ -148,7 +148,7 @@ ______________________________________________________________________
 
 ### File: `database_upgrade.py` (Reference Implementation)
 
-#### 🔴 CRITICAL BUG #1: Incomplete Deletion Logic (Lines 238-245)
+#### CRITICAL BUG #1: Incomplete Deletion Logic (Lines 238-245)
 
 ```python
 # C. Delete whatever is still missing
@@ -160,7 +160,7 @@ for remaining_hash in missing_hashes:
 
 # D. Clean up path-based missing files
 for path in missing_files:
-    pass  # ← EMPTY LOOP - LEFTOVER DEBUG CODE
+    pass  # <- EMPTY LOOP - LEFTOVER DEBUG CODE
 ```
 
 **Problem:**
@@ -185,7 +185,7 @@ for path in missing_files:
         stats["deleted"] += 1
 ```
 
-#### 🔴 CRITICAL BUG #2: No CDG Cleanup
+#### CRITICAL BUG #2: No CDG Cleanup
 
 **Problem:**
 The deletion logic doesn't handle CDG paired files. When a `.mp3` file is deleted:
@@ -212,7 +212,7 @@ elif ext in [".mp4", ".mkv", ".avi", ".webm"]:
 - When deleting CDG format, remove both files from DB
 - When scanning, only add the primary file (`.mp3`) as the playable song
 
-#### 🔴 CRITICAL BUG #3: Hash Collision Edge Case
+#### CRITICAL BUG #3: Hash Collision Edge Case
 
 **Problem (Line 228-232):**
 
@@ -233,7 +233,7 @@ If two different files produce the same hash (extremely rare but theoretically p
 
 **Fix:** Use SHA256 instead of MD5, or add file size as a secondary check.
 
-#### ⚠️ DESIGN ISSUE #1: Missing Search Index Population
+#### DESIGN ISSUE #1: Missing Search Index Population
 
 **Line 74:**
 
@@ -264,7 +264,7 @@ def add_song_placeholder(self, path, filename, fmt, fp):
     )
 ```
 
-#### ⚠️ DESIGN ISSUE #2: Missing Search Indices
+#### DESIGN ISSUE #2: Missing Search Indices
 
 The schema creates indices for:
 
@@ -286,7 +286,7 @@ CREATE INDEX IF NOT EXISTS idx_search_blob ON songs(search_blob);
 CREATE INDEX IF NOT EXISTS idx_is_visible ON songs(is_visible);
 ```
 
-#### ⚠️ DESIGN ISSUE #3: Platform Path Compatibility
+#### DESIGN ISSUE #3: Platform Path Compatibility
 
 **Lines 37-39:**
 
@@ -316,7 +316,7 @@ def __init__(self, db_path=None, backup_dir=None):
     self.backup_dir = backup_dir
 ```
 
-#### ⚠️ DESIGN ISSUE #4: No Last Scanned Timestamp
+#### DESIGN ISSUE #4: No Last Scanned Timestamp
 
 The schema doesn't track when the library was last synchronized. This makes it difficult to:
 
@@ -404,27 +404,23 @@ ______________________________________________________________________
 **Visual Layout:**
 
 ```
-┌─────────────────────────────────────────────────┐
-│ ▼ Manage Song Library                          │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│ Synchronize Library                            │
-│ ───────────────────────────────────────────     │
-│ Scan for new, moved, or deleted files on disk. │
-│ [Synchronize Library]                          │
-│                                                 │
-│ ─────────────────────────────────────────────   │
-│                                                 │
-│ Backup & Restore                               │
-│ ───────────────────────────────────────────     │
-│ Download a backup of your song database.       │
-│ [Download Database Backup]                     │
-│                                                 │
-│ Restore from a backup file:                    │
-│ [Choose File] [Restore Database]               │
-│ ⚠ This will overwrite your current library.    │
-│                                                 │
-└─────────────────────────────────────────────────┘
+
+  Manage Song Library
+
+ Synchronize Library
+
+ Scan for new, moved, or deleted files on disk.
+ [Synchronize Library]
+
+ Backup & Restore
+
+ Download a backup of your song database.
+ [Download Database Backup]
+
+ Restore from a backup file:
+ [Choose File] [Restore Database]
+  This will overwrite your current library.
+
 ```
 
 ______________________________________________________________________
@@ -483,13 +479,13 @@ ______________________________________________________________________
 
 | Extension | Format Name | Playback Support |
 |-----------|-------------|------------------|
-| `.mp4`    | Standalone  | ✅ Video + Audio |
-| `.mp3`    | Standalone  | ✅ Audio only    |
-| `.zip`    | ZIP         | ✅ CDG Archive   |
-| `.mkv`    | Standalone  | ✅ Video + Audio |
-| `.avi`    | Standalone  | ✅ Video + Audio |
-| `.webm`   | Standalone  | ✅ Video + Audio |
-| `.mov`    | Standalone  | ✅ Video + Audio |
+| `.mp4`    | Standalone  |  Video + Audio |
+| `.mp3`    | Standalone  |  Audio only    |
+| `.zip`    | ZIP         |  CDG Archive   |
+| `.mkv`    | Standalone  |  Video + Audio |
+| `.avi`    | Standalone  |  Video + Audio |
+| `.webm`   | Standalone  |  Video + Audio |
+| `.mov`    | Standalone  |  Video + Audio |
 
 ### To Support with Database (Enhanced Detection)
 
@@ -557,7 +553,7 @@ ______________________________________________________________________
 
 ## 9. Summary & Decisions
 
-### ✅ Decisions Made
+### Decisions Made
 
 | Decision Point | Resolution |
 |---------------|------------|
@@ -567,20 +563,20 @@ ______________________________________________________________________
 | **Admin UI Location** | Modify "Updates" section in `info.html` |
 | **Hash Algorithm** | SHA256 (more robust than MD5) |
 | **Pairing Logic** | Detect CDG, ASS pairs; store only primary file |
-| **Migration Strategy** | Coexistence → Gradual switchover |
+| **Migration Strategy** | Coexistence -> Gradual switchover |
 
-### 🔧 Fixes to Implement in STAGE 1
+### Fixes to Implement in STAGE 1
 
-1. ✅ Fix deletion logic to handle both hash-matched AND non-matched missing files
-2. ✅ Add CDG/ASS cleanup when deleting paired files
-3. ✅ Use `get_data_directory()` instead of hardcoded paths
-4. ✅ Populate `search_blob` field for fast full-text search
-5. ✅ Add proper indices for artist, title, search performance
-6. ✅ Add `metadata` table with `last_scan` tracking
-7. ✅ Upgrade hash to SHA256 for better collision resistance
-8. ✅ Add timestamps (`created_at`, `updated_at`) to songs table
+1. Fix deletion logic to handle both hash-matched AND non-matched missing files
+2. Add CDG/ASS cleanup when deleting paired files
+3. Use `get_data_directory()` instead of hardcoded paths
+4. Populate `search_blob` field for fast full-text search
+5. Add proper indices for artist, title, search performance
+6. Add `metadata` table with `last_scan` tracking
+7. Upgrade hash to SHA256 for better collision resistance
+8. Add timestamps (`created_at`, `updated_at`) to songs table
 
-### 📋 Next Steps (STAGE 1)
+### Next Steps (STAGE 1)
 
 1. Create `pikaraoke/lib/db.py` with fixed implementation
 2. Implement `KaraokeDB` class with:
@@ -597,15 +593,15 @@ ______________________________________________________________________
 
 ### Low Risk
 
-- ✅ Database file location (uses existing `get_data_directory()`)
-- ✅ Backup/restore (isolated feature, easy to test)
-- ✅ Coexistence strategy (no breaking changes)
+- Database file location (uses existing `get_data_directory()`)
+- Backup/restore (isolated feature, easy to test)
+- Coexistence strategy (no breaking changes)
 
 ### Medium Risk
 
-- ⚠️ File hash collisions (mitigated by SHA256)
-- ⚠️ Unicode filename handling (Windows path encoding)
-- ⚠️ Large library scan time (10K+ songs)
+- File hash collisions (mitigated by SHA256)
+- Unicode filename handling (Windows path encoding)
+- Large library scan time (10K+ songs)
 
 ### Mitigation Strategies
 
@@ -634,28 +630,28 @@ Based on template analysis:
 
 ```python
 # Routes referenced in info.html
-admin.refresh         → Rescan song directory
-admin.update_ytdl     → Update yt-dlp
-admin.quit            → Quit Pikaraoke
-admin.reboot          → Reboot system (Pi/Linux only)
-admin.shutdown        → Shutdown system (Pi/Linux only)
-admin.expand_fs       → Expand filesystem (Pi only)
-admin.login           → Admin login
-admin.logout          → Admin logout
-preferences.change_preferences → Update user preferences
-images.qrcode         → Serve QR code image
+admin.refresh         -> Rescan song directory
+admin.update_ytdl     -> Update yt-dlp
+admin.quit            -> Quit Pikaraoke
+admin.reboot          -> Reboot system (Pi/Linux only)
+admin.shutdown        -> Shutdown system (Pi/Linux only)
+admin.expand_fs       -> Expand filesystem (Pi only)
+admin.login           -> Admin login
+admin.logout          -> Admin logout
+preferences.change_preferences -> Update user preferences
+images.qrcode         -> Serve QR code image
 ```
 
 **New routes needed for STAGE 3:**
 
-- `admin.sync_library` → Synchronize database with disk
-- `admin.download_backup` → Export database backup
-- `admin.upload_backup` → Import database backup
+- `admin.sync_library` -> Synchronize database with disk
+- `admin.download_backup` -> Export database backup
+- `admin.upload_backup` -> Import database backup
 
 ______________________________________________________________________
 
 **END OF STAGE 0 ANALYSIS**
 
-**Status:** ✅ Ready to proceed to STAGE 1
+**Status:**  Ready to proceed to STAGE 1
 **Approved:** Pending user confirmation
 **Next Action:** Create `pikaraoke/lib/db.py` with all fixes applied

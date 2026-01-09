@@ -3,7 +3,7 @@
 **Project:** PiKaraoke SQLite Database Migration
 **Version:** 1.0
 **Date:** 2026-01-09
-**Status:** 📋 Planning Complete - Awaiting Stage 1 Approval
+**Status:**  Planning Complete - Awaiting Stage 1 Approval
 
 ______________________________________________________________________
 
@@ -24,7 +24,7 @@ The implementation is divided into **4 distinct stages**, each with clear succes
 
 | Stage | Name | Complexity | Risk | Dependencies |
 |-------|------|------------|------|--------------|
-| **0** | Context & Analysis | Low | None | ✅ Complete |
+| **0** | Context & Analysis | Low | None |  Complete |
 | **1** | Core Database Layer | Medium | Low | Stage 0 |
 | **2** | Read-Only Integration | Medium | Low | Stage 1 |
 | **3** | Admin UI - Library Management | High | Medium | Stage 2 |
@@ -57,32 +57,32 @@ Based on analysis of existing codebase patterns:
 
 This follows the established pattern in the codebase:
 
-- `download_manager.py` → `DownloadManager`
-- `stream_manager.py` → `StreamManager`
-- `song_list.py` → `SongList`
-- `karaoke_database.py` → `KaraokeDatabase` ✅
+- `download_manager.py` -> `DownloadManager`
+- `stream_manager.py` -> `StreamManager`
+- `song_list.py` -> `SongList`
+- `karaoke_database.py` -> `KaraokeDatabase`
 
 ______________________________________________________________________
 
 ## Stage Overview
 
-### Stage 0: Context & Analysis ✅ COMPLETE
+### Stage 0: Context & Analysis  COMPLETE
 
 **Status:** Complete
 **Document:** `docs/database-upgrade-stage0-analysis.md`
 
 **Key Deliverables:**
 
-- ✅ Analyzed existing codebase structure
-- ✅ Identified storage locations
-- ✅ Found and documented bugs in reference implementation
-- ✅ Created integration strategy
+- Analyzed existing codebase structure
+- Identified storage locations
+- Found and documented bugs in reference implementation
+- Created integration strategy
 
 ______________________________________________________________________
 
 ### Stage 1: Core Database Layer
 
-**Status:** 📋 Planned
+**Status:**  Planned
 **Document:** `docs/stage1-core-database.md`
 **Estimated Complexity:** Medium
 **Risk Level:** Low
@@ -104,7 +104,7 @@ ______________________________________________________________________
 - \[ \] `check_integrity()` validates database health
 - \[ \] Unit tests pass for all edge cases
 - \[ \] Handles CDG/ASS paired files correctly
-- \[ \] Development database viewer accessible when `--dev-mode` flag is enabled
+- \[ \] Development database viewer accessible to admin users
 
 **Deliverables:**
 
@@ -119,12 +119,11 @@ To assist with database development, inspection, and debugging during Stages 1-4
 
 - **Tool:** [sqlite-web](https://github.com/coleifer/sqlite-web)
 - **Installation:** `uv add --dev sqlite-web`
-- **Access:** Navigate to `http://localhost:5555/dev/database` when running with `--dev-mode` flag
+- **Access:** Navigate to `http://localhost:5555/dev/database` (requires admin login)
 - **Security:**
-  - Only available when `--dev-mode` command-line flag is explicitly set
   - Protected by existing `@is_admin` decorator
-  - Never deployed to production (flag not passed in release builds)
-  - Can be configured as read-only or read-write based on development needs
+  - Configured as read-only by default for safety
+  - Optional dependency (graceful fallback if not installed)
 
 **Features:**
 
@@ -139,33 +138,40 @@ To assist with database development, inspection, and debugging during Stages 1-4
 
 ```python
 # In pikaraoke/app.py (or relevant initialization file)
-if args.dev_mode:
-    try:
-        from sqlite_web import SqliteWebBlueprint
+try:
+    from sqlite_web import SqliteWebBlueprint
 
-        db_path = os.path.join(get_data_directory(), "pikaraoke.db")
+    db_path = os.path.join(get_data_directory(), "pikaraoke.db")
+    if os.path.exists(db_path):
         db_blueprint = SqliteWebBlueprint(
             database=db_path,
             name="dev_database",
-            read_only=False,  # Allow modifications during development
+            read_only=True,  # Read-only for safety
         )
+
+        # Register with admin authentication
+        @db_blueprint.before_request
+        def require_admin():
+            if not is_admin():
+                return redirect(url_for("login"))
+
         app.register_blueprint(db_blueprint, url_prefix="/dev/database")
-        logger.info("Development database viewer enabled at /dev/database")
-    except ImportError:
-        logger.warning("sqlite-web not installed. Run: uv add --dev sqlite-web")
+        logger.info("Database viewer enabled at /dev/database (admin only)")
+except ImportError:
+    logger.warning("sqlite-web not installed. Run: uv add --dev sqlite-web")
 ```
 
 **Usage During Development:**
 
 ```bash
-# Start PiKaraoke with development mode
-python -m pikaraoke --dev-mode
+# Start PiKaraoke normally
+python -m pikaraoke
 
-# Access the database viewer
+# Access the database viewer (requires admin login)
 # Navigate to: http://localhost:5555/dev/database
 ```
 
-**Note:** This development tool is designed to be removed before deployment by simply not passing the `--dev-mode` flag. It provides deep database inspection capabilities that complement the user-facing admin features planned for Stage 3.
+**Note:** This development tool is read-only and admin-protected, making it safe for deployment. It provides deep database inspection capabilities that complement the user-facing admin features planned for Stage 3.
 
 **Pause Point:** Validate database operations in isolation before integrating into main app.
 
@@ -173,7 +179,7 @@ ______________________________________________________________________
 
 ### Stage 2: Read-Only Integration
 
-**Status:** 📋 Planned
+**Status:**  Planned
 **Document:** `docs/stage2-app-integration.md`
 **Estimated Complexity:** Medium
 **Risk Level:** Low
@@ -218,7 +224,7 @@ ______________________________________________________________________
 
 ### Stage 3: Admin UI - Library Management
 
-**Status:** 📋 Planned
+**Status:**  Planned
 **Document:** `docs/stage3-admin-ui.md`
 **Estimated Complexity:** High
 **Risk Level:** Medium
@@ -251,22 +257,22 @@ ______________________________________________________________________
 **UI Mock:**
 
 ```
-┌─────────────────────────────────────────────────┐
-│ ▼ Manage Song Library                          │
-├─────────────────────────────────────────────────┤
-│ Synchronize Library                            │
-│ Scan for new, moved, or deleted files.         │
-│ Last synced: 2026-01-09 14:30:22               │
-│ [Synchronize Library]                          │
-│                                                 │
-│ Backup & Restore                               │
-│ Download a snapshot of your song database.     │
-│ [Download Database Backup]                     │
-│                                                 │
-│ Restore from a backup file:                    │
-│ [Choose File] [Restore Database]               │
-│ ⚠ This will overwrite your current library.    │
-└─────────────────────────────────────────────────┘
+
+  Manage Song Library
+
+ Synchronize Library
+ Scan for new, moved, or deleted files.
+ Last synced: 2026-01-09 14:30:22
+ [Synchronize Library]
+
+ Backup & Restore
+ Download a snapshot of your song database.
+ [Download Database Backup]
+
+ Restore from a backup file:
+ [Choose File] [Restore Database]
+  This will overwrite your current library.
+
 ```
 
 **Pause Point:** Validate backup/restore workflow with test databases before enabling for users.
@@ -275,7 +281,7 @@ ______________________________________________________________________
 
 ### Stage 4: Metadata Enrichment (Future)
 
-**Status:** 📋 Planned
+**Status:**  Planned
 **Document:** `docs/stage4-metadata-enrichment.md`
 **Estimated Complexity:** High
 **Risk Level:** Medium
@@ -451,8 +457,8 @@ ______________________________________________________________________
 ## Timeline & Dependencies
 
 ```
-Stage 0 (Complete) ──→ Stage 1 (Core DB) ──→ Stage 2 (Integration) ──→ Stage 3 (Admin UI) ──→ Stage 4 (Metadata)
-     ✅                    [NEXT]                  [Blocked]              [Blocked]            [Optional]
+Stage 0 (Complete) -> Stage 1 (Core DB) -> Stage 2 (Integration) -> Stage 3 (Admin UI) -> Stage 4 (Metadata)
+                         [NEXT]                  [Blocked]              [Blocked]            [Optional]
 ```
 
 **Critical Path:**
@@ -485,8 +491,7 @@ ______________________________________________________________________
 
 ### Modified Files
 
-- \[ \] `pikaraoke/app.py` - Development database viewer integration (Stage 1)
-- \[ \] `pikaraoke/lib/args.py` - Add `--dev-mode` flag (Stage 1)
+- \[ \] `pikaraoke/app.py` - Database viewer integration (Stage 1)
 - \[ \] `pyproject.toml` - Add `sqlite-web` as dev dependency (Stage 1)
 - \[ \] `pikaraoke/karaoke.py` - Database initialization (Stage 2)
 - \[ \] `pikaraoke/templates/info.html` - Admin UI updates (Stage 3)
@@ -498,20 +503,20 @@ ______________________________________________________________________
 - `{get_data_directory()}/pikaraoke.db` - Main database
 - `{get_data_directory()}/backups/*.db` - Backup snapshots
 
-### Development-Only Files (Not Deployed)
+### Admin-Only Features
 
-- Development database viewer accessible at `/dev/database` (when `--dev-mode` is enabled)
+- Database viewer accessible at `/dev/database` (admin login required, read-only)
 
 ______________________________________________________________________
 
 ## Next Steps
 
-1. ✅ Review and approve this implementation plan
-2. 📝 Create detailed Stage 1 planning document
-3. 📝 Create detailed Stage 2 planning document
-4. 📝 Create detailed Stage 3 planning document
-5. 📝 Create detailed Stage 4 planning document (optional)
-6. 🚀 Begin Stage 1 implementation
+1. Review and approve this implementation plan
+2. Create detailed Stage 1 planning document
+3. Create detailed Stage 2 planning document
+4. Create detailed Stage 3 planning document
+5. Create detailed Stage 4 planning document (optional)
+6. Begin Stage 1 implementation
 
 **Awaiting:** User approval to proceed with detailed stage planning documents.
 

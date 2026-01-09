@@ -1,7 +1,7 @@
 # PiKaraoke Database Upgrade - Implementation Order
 
 **Created:** 2026-01-09
-**Status:** 📋 Planning Complete - Implementation Guide
+**Status:**  Planning Complete - Implementation Guide
 **Purpose:** Step-by-step implementation sequence with dependencies
 
 ______________________________________________________________________
@@ -210,12 +210,12 @@ ______________________________________________________________________
 
    ```
    test_library/
-   ├── Artist1 - Song1.mp3
-   ├── Artist1 - Song1.cdg
-   ├── Artist2 - Song2.mp4
-   ├── Artist3 - Song3.mp3
-   └── subfolder/
-       └── Artist4 - Song4.mp3
+    Artist1 - Song1.mp3
+    Artist1 - Song1.cdg
+    Artist2 - Song2.mp4
+    Artist3 - Song3.mp3
+    subfolder/
+        Artist4 - Song4.mp3
    ```
 
 2. Run interactive Python session:
@@ -262,14 +262,14 @@ ______________________________________________________________________
 
 **Before proceeding to Stage 2:**
 
-- \[ \] ✅ `karaoke_database.py` created and imports successfully
-- \[ \] ✅ All unit tests pass (no failures, no skips)
-- \[ \] ✅ Manual testing shows correct behavior
-- \[ \] ✅ Code review completed (if working in team)
-- \[ \] ✅ Performance benchmarks met (\< 15s for 1K songs)
-- \[ \] ✅ No memory leaks (test with 10K+ songs)
-- \[ \] ✅ Documentation comments added to public methods
-- \[ \] ✅ Git commit created: `feat(database): implement KaraokeDatabase core module`
+- \[ \]  `karaoke_database.py` created and imports successfully
+- \[ \]  All unit tests pass (no failures, no skips)
+- \[ \]  Manual testing shows correct behavior
+- \[ \]  Code review completed (if working in team)
+- \[ \]  Performance benchmarks met (\< 15s for 1K songs)
+- \[ \]  No memory leaks (test with 10K+ songs)
+- \[ \]  Documentation comments added to public methods
+- \[ \]  Git commit created: `feat(database): implement KaraokeDatabase core module`
 
 **Deliverables:**
 
@@ -435,13 +435,13 @@ ______________________________________________________________________
 
 **Before proceeding to Stage 3:**
 
-- \[ \] ✅ Database integrated into `karaoke.py`
-- \[ \] ✅ All integration tests pass
-- \[ \] ✅ All performance benchmarks met
-- \[ \] ✅ Zero breaking changes confirmed
-- \[ \] ✅ User acceptance testing complete (manual test by end user)
-- \[ \] ✅ Logs reviewed (no unexpected warnings/errors)
-- \[ \] ✅ Git commit created: `feat(database): integrate KaraokeDatabase into main app`
+- \[ \]  Database integrated into `karaoke.py`
+- \[ \]  All integration tests pass
+- \[ \]  All performance benchmarks met
+- \[ \]  Zero breaking changes confirmed
+- \[ \]  User acceptance testing complete (manual test by end user)
+- \[ \]  Logs reviewed (no unexpected warnings/errors)
+- \[ \]  Git commit created: `feat(database): integrate KaraokeDatabase into main app`
 
 **Deliverables:**
 
@@ -586,7 +586,7 @@ ______________________________________________________________________
    ```html
    <!-- Replace old "Refresh" section with new "Manage Song Library" -->
    <div class="box">
-       <h3 class="title is-4">🎵 Manage Song Library</h3>
+       <h3 class="title is-4"> Manage Song Library</h3>
 
        <!-- Library Status -->
        <div id="library-status" class="content">
@@ -804,14 +804,14 @@ ______________________________________________________________________
 
 **Before proceeding to Stage 4:**
 
-- \[ \] ✅ All 4 Flask routes implemented and tested
-- \[ \] ✅ Admin UI updated and functional
-- \[ \] ✅ JavaScript handlers working correctly
-- \[ \] ✅ All integration tests pass
-- \[ \] ✅ Security review complete (admin auth, file validation)
-- \[ \] ✅ Mobile responsiveness verified
-- \[ \] ✅ User acceptance testing complete
-- \[ \] ✅ Git commit created: `feat(admin): add library management UI`
+- \[ \]  All 4 Flask routes implemented and tested
+- \[ \]  Admin UI updated and functional
+- \[ \]  JavaScript handlers working correctly
+- \[ \]  All integration tests pass
+- \[ \]  Security review complete (admin auth, file validation)
+- \[ \]  Mobile responsiveness verified
+- \[ \]  User acceptance testing complete
+- \[ \]  Git commit created: `feat(admin): add library management UI`
 
 **Deliverables:**
 
@@ -1194,7 +1194,7 @@ ______________________________________________________________________
 
 ```html
 <div class="box">
-    <h3 class="title is-4">🎵 Metadata Enrichment</h3>
+    <h3 class="title is-4"> Metadata Enrichment</h3>
 
     <div id="enrichment-status" class="content">
         <p><strong>Status:</strong> <span id="worker-status">Stopped</span></p>
@@ -1282,15 +1282,15 @@ ______________________________________________________________________
 
 **Before considering project complete:**
 
-- \[ \] ✅ Schema updated with enrichment fields
-- \[ \] ✅ Filename parsing implemented and tested
-- \[ \] ✅ Enrichment worker implemented and tested
-- \[ \] ✅ Admin UI shows enrichment progress
-- \[ \] ✅ API key configuration documented
-- \[ \] ✅ All unit tests updated and passing
-- \[ \] ✅ Performance acceptable (doesn't slow down app)
-- \[ \] ✅ User documentation updated
-- \[ \] ✅ Git commit created: `feat(metadata): add background enrichment with confidence scoring`
+- \[ \]  Schema updated with enrichment fields
+- \[ \]  Filename parsing implemented and tested
+- \[ \]  Enrichment worker implemented and tested
+- \[ \]  Admin UI shows enrichment progress
+- \[ \]  API key configuration documented
+- \[ \]  All unit tests updated and passing
+- \[ \]  Performance acceptable (doesn't slow down app)
+- \[ \]  User documentation updated
+- \[ \]  Git commit created: `feat(metadata): add background enrichment with confidence scoring`
 
 **Deliverables:**
 
@@ -1324,37 +1324,37 @@ ______________________________________________________________________
 
 ```
 Stage 1 (Core Database)
-    │
-    ├─ Step 1.1: Create karaoke_database.py
-    ├─ Step 1.2: Create unit tests
-    └─ Step 1.3: Manual testing
 
-    ↓ (All Stage 1 tests must pass)
+     Step 1.1: Create karaoke_database.py
+     Step 1.2: Create unit tests
+     Step 1.3: Manual testing
+
+     (All Stage 1 tests must pass)
 
 Stage 2 (Integration)
-    │
-    ├─ Step 2.1: Modify karaoke.py
-    ├─ Step 2.2: Integration testing
-    └─ Step 2.3: Performance benchmarking
 
-    ↓ (Zero breaking changes verified)
+     Step 2.1: Modify karaoke.py
+     Step 2.2: Integration testing
+     Step 2.3: Performance benchmarking
+
+     (Zero breaking changes verified)
 
 Stage 3 (Admin UI)
-    │
-    ├─ Step 3.1: Create Flask routes
-    ├─ Step 3.2: Update template
-    ├─ Step 3.3: Add JavaScript
-    └─ Step 3.4: Integration testing
 
-    ↓ (Optional - can skip to deployment)
+     Step 3.1: Create Flask routes
+     Step 3.2: Update template
+     Step 3.3: Add JavaScript
+     Step 3.4: Integration testing
+
+     (Optional - can skip to deployment)
 
 Stage 4 (Metadata) - OPTIONAL
-    │
-    ├─ Step 4.1: Update schema
-    ├─ Step 4.2: Filename parsing
-    ├─ Step 4.3: Enrichment worker
-    ├─ Step 4.4: Integrate worker
-    └─ Step 4.5: Admin UI
+
+     Step 4.1: Update schema
+     Step 4.2: Filename parsing
+     Step 4.3: Enrichment worker
+     Step 4.4: Integrate worker
+     Step 4.5: Admin UI
 ```
 
 ______________________________________________________________________
@@ -1363,10 +1363,10 @@ ______________________________________________________________________
 
 | Stage | Estimated Time | Can Skip? |
 |-------|----------------|-----------|
-| Stage 1 | 1-2 days | ❌ No |
-| Stage 2 | 0.5-1 day | ❌ No |
-| Stage 3 | 1-2 days | ❌ No |
-| Stage 4 | 2-3 days | ✅ Yes |
+| Stage 1 | 1-2 days |  No |
+| Stage 2 | 0.5-1 day |  No |
+| Stage 3 | 1-2 days |  No |
+| Stage 4 | 2-3 days |  Yes |
 | **Total** | **4.5-8 days** | |
 
 **Note:** Times assume single developer working full-time. Adjust for part-time work or team collaboration.
@@ -1390,24 +1390,24 @@ ______________________________________________________________________
 
 **You're on track if:**
 
-- ✅ Each stage completion criteria checklist is 100% complete before proceeding
-- ✅ All tests pass (no skipped or disabled tests)
-- ✅ Performance benchmarks met at each stage
-- ✅ No breaking changes introduced (verified by integration tests)
-- ✅ Code reviews completed before moving to next stage
-- ✅ Git commits are clean and well-documented
-- ✅ User can't tell anything changed (Stages 1-2)
-- ✅ User sees new features work as expected (Stage 3-4)
+- Each stage completion criteria checklist is 100% complete before proceeding
+- All tests pass (no skipped or disabled tests)
+- Performance benchmarks met at each stage
+- No breaking changes introduced (verified by integration tests)
+- Code reviews completed before moving to next stage
+- Git commits are clean and well-documented
+- User can't tell anything changed (Stages 1-2)
+- User sees new features work as expected (Stage 3-4)
 
 **Warning signs:**
 
-- ❌ Skipping tests "to save time"
-- ❌ Moving to next stage with failing tests
-- ❌ Performance degradation ignored
-- ❌ Breaking changes found but not fixed
-- ❌ Users reporting issues during testing
-- ❌ Database corruption during testing
-- ❌ Memory leaks or crashes
+- Skipping tests "to save time"
+- Moving to next stage with failing tests
+- Performance degradation ignored
+- Breaking changes found but not fixed
+- Users reporting issues during testing
+- Database corruption during testing
+- Memory leaks or crashes
 
 ______________________________________________________________________
 
@@ -1464,6 +1464,6 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-**Document Status:** ✅ Complete
+**Document Status:**  Complete
 **Last Updated:** 2026-01-09
 **Next Step:** Begin Stage 1 - Step 1.1 (Create karaoke_database.py)

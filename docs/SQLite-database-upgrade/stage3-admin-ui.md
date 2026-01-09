@@ -1,7 +1,7 @@
 # Stage 3: Admin UI - Manage Song Library - Complete Implementation Plan
 
 **Stage:** 3 of 4
-**Status:** 📋 Ready for Implementation (After Stage 2)
+**Status:**  Ready for Implementation (After Stage 2)
 **Prerequisites:** Stage 2 (Read-Only Integration Complete)
 **Estimated Effort:** 1-2 days
 **Risk Level:** Medium
@@ -13,8 +13,9 @@ ______________________________________________________________________
 Expose database management features through the admin web interface, allowing users to:
 
 1. **Synchronize Library** - Manually trigger database sync with disk
-2. **Download Backup** - Export database snapshot for safekeeping
-3. **Restore from Backup** - Import previously exported database
+2. **Reset Database** - Wipe and rebuild database from scratch
+3. **Download Backup** - Export database snapshot for safekeeping
+4. **Restore from Backup** - Import previously exported database
 
 **Critical Requirements:**
 
@@ -36,15 +37,15 @@ ______________________________________________________________________
 **Current UI:**
 
 ```
-┌─────────────────────────────────────────┐
-│ ▼ Refresh the song list                │
-├─────────────────────────────────────────┤
-│ You should only need to do this if you │
-│ manually copied files to the download  │
-│ directory while pikaraoke was running.  │
-│                                         │
-│ [Rescan song directory]                │
-└─────────────────────────────────────────┘
+
+  Refresh the song list
+
+ You should only need to do this if you
+ manually copied files to the download
+ directory while pikaraoke was running.
+
+ [Rescan song directory]
+
 ```
 
 ### Proposed State (Stage 3)
@@ -54,31 +55,37 @@ ______________________________________________________________________
 **New UI:**
 
 ```
-┌───────────────────────────────────────────────────────┐
-│ ▼ Manage Song Library                                │
-├───────────────────────────────────────────────────────┤
-│                                                       │
-│ 📊 Library Status                                    │
-│ ─────────────────────────────────────────────────     │
-│ Total songs: 1,247                                   │
-│ Last synchronized: 2026-01-09 14:30:22               │
-│                                                       │
-│ 🔄 Synchronize Library                               │
-│ ─────────────────────────────────────────────────     │
-│ Scan for new, moved, or deleted files on disk.       │
-│ [Synchronize Library]                                │
-│                                                       │
-│ 💾 Backup & Restore                                  │
-│ ─────────────────────────────────────────────────     │
-│ Download a snapshot of your song database for        │
-│ safekeeping or transfer to another system.           │
-│ [Download Database Backup]                           │
-│                                                       │
-│ Restore from a previously downloaded backup:         │
-│ [Choose File...] [Restore from Backup]               │
-│ ⚠ Warning: This will overwrite your current library. │
-│                                                       │
-└───────────────────────────────────────────────────────┘
+
+  Manage Song Library
+
+  Library Status
+
+ Total songs: 1,247
+ Last synchronized: 2026-01-09 14:30:22
+
+  Synchronize Library
+
+ Scan for new, moved, or deleted files on disk.
+ [Synchronize Library]
+
+  Reset Database
+
+ Completely wipe and rebuild the database from
+ scratch by rescanning all files.
+ [Reset Database]
+  Warning: This will delete all metadata and
+   rebuild from files.
+
+  Backup & Restore
+
+ Download a snapshot of your song database for
+ safekeeping or transfer to another system.
+ [Download Database Backup]
+
+ Restore from a previously downloaded backup:
+ [Choose File...] [Restore from Backup]
+  Warning: This will overwrite your current library.
+
 ```
 
 ______________________________________________________________________
@@ -141,7 +148,86 @@ def sync_library():
         )
 ```
 
-#### Route 2: Download Backup
+#### Route 2: Reset Database
+
+```python
+@admin_bp.route("/reset_database")
+@requires_admin
+def reset_database():
+    """Completely wipe and rebuild database from scratch.
+
+    Returns JSON with stats or error message.
+    """
+    try:
+        from flask import current_app
+
+        k = current_app.karaoke_instance
+
+        # Close existing database connection
+        k.db.close()
+
+        # Delete database files (main, WAL, SHM)
+        import os
+
+        for ext in ["", "-wal", "-shm"]:
+            db_file = k.db.db_path + ext
+            if os.path.exists(db_file):
+                try:
+                    os.remove(db_file)
+                    logging.info(f"Deleted {db_file}")
+                except OSError as e:
+                    logging.warning(f"Failed to delete {db_file}: {e}")
+
+        # Reinitialize database with fresh schema
+        from pikaraoke.lib.karaoke_database import KaraokeDatabase
+
+        k.db = KaraokeDatabase()
+
+        # Perform full scan to rebuild from files
+        stats = k.db.scan_library(k.download_path)
+
+        # Update legacy SongList for backwards compatibility
+        k.available_songs.clear()
+        k.available_songs.update(k.db.get_all_song_paths())
+
+        # Update last scan timestamp
+        from datetime import datetime
+
+        k.db.conn.execute(
+            "INSERT OR REPLACE INTO metadata (key, value) VALUES ('last_scan', ?)",
+            (datetime.now().isoformat(),),
+        )
+        k.db.conn.commit()
+
+        # Return success with stats
+        return jsonify(
+            {
+                "success": True,
+                "message": f"Database reset complete. {stats['added']} songs found.",
+                "stats": stats,
+                "total_songs": k.db.get_song_count(),
+            }
+        )
+
+    except Exception as e:
+        logging.error(f"Reset database failed: {e}")
+        # Attempt to reinitialize database even on error
+        try:
+            from flask import current_app
+            from pikaraoke.lib.karaoke_database import KaraokeDatabase
+
+            k = current_app.karaoke_instance
+            k.db = KaraokeDatabase()
+        except:
+            pass
+
+        return (
+            jsonify({"success": False, "message": f"Database reset failed: {str(e)}"}),
+            500,
+        )
+```
+
+#### Route 3: Download Backup
 
 ```python
 from flask import send_file
@@ -179,7 +265,7 @@ def download_backup():
         return f"Backup download failed: {str(e)}", 500
 ```
 
-#### Route 3: Upload and Restore Backup
+#### Route 4: Upload and Restore Backup
 
 ```python
 from flask import request
@@ -255,7 +341,7 @@ def restore_backup():
         return jsonify({"success": False, "message": f"Restore failed: {str(e)}"}), 500
 ```
 
-#### Route 4: Get Library Stats (AJAX)
+#### Route 5: Get Library Stats (AJAX)
 
 ```python
 @admin_bp.route("/library_stats")
@@ -305,13 +391,13 @@ ______________________________________________________________________
 <div class="card">
     <header class="card-header py-3 px-5 collapsible-header is-collapsed">
         {# MSG: Header for the Manage Song Library section #}
-        <h3 class="title mb-0">📚 {% trans %}Manage Song Library{% endtrans %}</h3>
+        <h3 class="title mb-0"> {% trans %}Manage Song Library{% endtrans %}</h3>
     </header>
     <div class="card-content collapsible-content">
         <div class="content">
 
             {# Library Status #}
-            <h5>📊 {% trans %}Library Status{% endtrans %}</h5>
+            <h5> {% trans %}Library Status{% endtrans %}</h5>
             <div id="library-status" class="box has-background-light">
                 <p>
                     <strong>{% trans %}Total songs:{% endtrans %}</strong>
@@ -326,7 +412,7 @@ ______________________________________________________________________
             <hr>
 
             {# Synchronize Library #}
-            <h5>🔄 {% trans %}Synchronize Library{% endtrans %}</h5>
+            <h5> {% trans %}Synchronize Library{% endtrans %}</h5>
             <p class="subtitle is-size-6">
                 {# MSG: Explanation of what synchronize does #}
                 {% trans -%}
@@ -344,8 +430,43 @@ ______________________________________________________________________
 
             <hr>
 
+            {# Reset Database #}
+            <h5> {% trans %}Reset Database{% endtrans %}</h5>
+            <p class="subtitle is-size-6">
+                {# MSG: Explanation of what reset database does #}
+                {% trans -%}
+                    Completely wipe the database and rebuild it from scratch by rescanning all files.
+                    This is useful if you suspect database corruption or want to start fresh.
+                {%- endtrans %}
+            </p>
+            <button id="reset-database-btn" class="button is-danger is-inverted">
+                <span class="icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </span>
+                <span>{% trans %}Reset Database{% endtrans %}</span>
+            </button>
+            <div id="reset-result" class="notification is-hidden mt-3"></div>
+
+            <p class="has-text-danger is-size-7 mt-3">
+                <span class="icon-text">
+                    <span class="icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </span>
+                    <span>
+                        {# MSG: Warning about reset deleting all data #}
+                        {% trans -%}
+                            Warning: This will delete all metadata, enrichment data, and customizations.
+                            The database will be rebuilt from scratch by scanning files.
+                            Consider downloading a backup first.
+                        {%- endtrans %}
+                    </span>
+                </span>
+            </p>
+
+            <hr>
+
             {# Backup & Restore #}
-            <h5>💾 {% trans %}Backup & Restore{% endtrans %}</h5>
+            <h5> {% trans %}Backup & Restore{% endtrans %}</h5>
 
             {# Download Backup #}
             <div class="mb-4">
@@ -509,6 +630,83 @@ $(function() {
     });
 
     // ============================================================
+    // RESET DATABASE
+    // ============================================================
+    $('#reset-database-btn').click(function(e) {
+        e.preventDefault();
+
+        // Strong confirmation dialog
+        const confirmed = confirm(
+            "{% trans %}Are you absolutely sure you want to reset the database? " +
+            "This will DELETE ALL metadata, enrichment data, and customizations. " +
+            "The database will be rebuilt from scratch. " +
+            "This action CANNOT be undone. " +
+            "Consider downloading a backup first.{% endtrans %}"
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        // Second confirmation
+        const doubleConfirm = confirm(
+            "{% trans %}Final confirmation: Reset database and lose all metadata?{% endtrans %}"
+        );
+
+        if (!doubleConfirm) {
+            return;
+        }
+
+        const $btn = $(this);
+        const $result = $('#reset-result');
+
+        // Disable button and show loading state
+        $btn.prop('disabled', true).addClass('is-loading');
+        $result.removeClass('is-success is-danger').addClass('is-hidden');
+
+        $.get("{{ url_for('admin.reset_database') }}")
+            .done(function(data) {
+                if (data.success) {
+                    // Show success message with stats
+                    $result.removeClass('is-hidden is-danger')
+                           .addClass('is-success')
+                           .html(`
+                               <strong>{% trans %}Success!{% endtrans %}</strong><br>
+                               ${data.message}<br>
+                               <small>{% trans %}Total songs:{% endtrans %} ${data.total_songs.toLocaleString()}</small><br>
+                               <em>{% trans %}Refreshing page in 3 seconds...{% endtrans %}</em>
+                           `);
+
+                    // Update stats display
+                    loadLibraryStats();
+
+                    // Reload page after success to refresh everything
+                    setTimeout(function() {
+                        location.reload();
+                    }, 3000);
+                } else {
+                    // Show error
+                    $result.removeClass('is-hidden is-success')
+                           .addClass('is-danger')
+                           .text(data.message);
+                }
+            })
+            .fail(function(xhr) {
+                let message = "{% trans %}Database reset failed. Check logs.{% endtrans %}";
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    message = xhr.responseJSON.message;
+                }
+                $result.removeClass('is-hidden is-success')
+                       .addClass('is-danger')
+                       .text(message);
+            })
+            .always(function() {
+                // Re-enable button
+                $btn.prop('disabled', false).removeClass('is-loading');
+            });
+    });
+
+    // ============================================================
     // BACKUP FILE UPLOAD - Show filename when selected
     // ============================================================
     $('#backup-file-input').change(function() {
@@ -588,6 +786,58 @@ $(function() {
 
 ______________________________________________________________________
 
+## Reset Database Feature - Design Rationale
+
+### Why This Feature is Important
+
+The "Reset Database" feature is critical for the early stages of database management for several reasons:
+
+1. **Development & Testing**: During the migration from the legacy system, there may be bugs or issues in the database schema or sync logic. A reset allows for quick recovery.
+
+2. **User Accessibility**: Users may not know where the database file is located on their system. Providing an admin UI option removes the need for technical knowledge about file paths.
+
+3. **Corruption Recovery**: If the database becomes corrupted or enters an inconsistent state, users can rebuild from the authoritative source (the files on disk).
+
+4. **Fresh Start Option**: Users may want to wipe all metadata and enrichment data to start fresh, perhaps after reorganizing their file structure.
+
+### How It Works
+
+The reset operation performs these steps:
+
+1. **Close Database Connection**: Properly closes the SQLite connection to release file locks
+2. **Delete Database Files**: Removes the main .db file plus WAL and SHM journal files
+3. **Reinitialize Schema**: Creates a fresh database with the current schema version
+4. **Full Scan**: Performs a complete rescan of the songs directory to rebuild the library
+5. **Update Legacy Data**: Synchronizes the legacy `SongList` for backward compatibility
+
+### Safety Considerations
+
+- **Double Confirmation**: Requires two separate confirmation dialogs to prevent accidental resets
+- **Strong Warning**: Clear warning messages explain what will be lost
+- **Backup Reminder**: Suggests downloading a backup before proceeding
+- **Automatic Recovery**: If reset fails, attempts to reinitialize the database to a working state
+- **Page Reload**: Automatically refreshes the page after success to ensure all UI is updated
+
+### Alternative: Deleting the Database File
+
+Users could alternatively:
+
+1. Stop PiKaraoke
+2. Find the database file (typically in `~/.pikaraoke/pikaraoke.db`)
+3. Delete the file manually
+4. Restart PiKaraoke
+
+However, this requires:
+
+- Knowledge of where the database is stored
+- Command-line or file system access
+- Stopping and restarting the application
+- Technical understanding of the system
+
+The admin UI approach is much more user-friendly and accessible.
+
+______________________________________________________________________
+
 ## Security Considerations
 
 ### 1. Admin Authentication
@@ -660,41 +910,56 @@ ______________________________________________________________________
 
 #### Test 1: Synchronize Library
 
-- \[ \] Click "Synchronize Library" with no changes → Shows "0 added, 0 moved, 0 deleted"
-- \[ \] Add new file to disk, click sync → Shows "1 added"
-- \[ \] Move file on disk, click sync → Shows "1 moved, 0 deleted"
-- \[ \] Delete file from disk, click sync → Shows "1 deleted"
+- \[ \] Click "Synchronize Library" with no changes -> Shows "0 added, 0 moved, 0 deleted"
+- \[ \] Add new file to disk, click sync -> Shows "1 added"
+- \[ \] Move file on disk, click sync -> Shows "1 moved, 0 deleted"
+- \[ \] Delete file from disk, click sync -> Shows "1 deleted"
 - \[ \] Stats update correctly after sync
 - \[ \] Last sync timestamp updates
 - \[ \] Success notification displays
 
-#### Test 2: Download Backup
+#### Test 2: Reset Database
 
-- \[ \] Click "Download Database Backup" → File downloads
+- \[ \] Click "Reset Database" -> Double confirmation dialog appears
+- \[ \] Cancel first confirmation -> Operation aborted
+- \[ \] Confirm first but cancel second -> Operation aborted
+- \[ \] Confirm both dialogs -> Database is wiped and rebuilt
+- \[ \] Success notification displays with song count
+- \[ \] Stats update correctly after reset
+- \[ \] Last sync timestamp updates
+- \[ \] Page refreshes after 3 seconds
+- \[ \] All songs present after reset (scanned from files)
+- \[ \] Previous metadata is gone (fresh start)
+
+#### Test 3: Download Backup
+
+- \[ \] Click "Download Database Backup" -> File downloads
 - \[ \] Downloaded file is valid SQLite (can open in DB Browser)
 - \[ \] Downloaded file contains all songs
 - \[ \] Filename includes timestamp
 - \[ \] File size is reasonable (not corrupt/empty)
 
-#### Test 3: Restore from Backup
+#### Test 4: Restore from Backup
 
-- \[ \] Select backup file → Filename displays, button enables
-- \[ \] Click "Restore" → Confirmation dialog appears
-- \[ \] Cancel confirmation → Operation aborted
-- \[ \] Confirm restoration → Success message shows
+- \[ \] Select backup file -> Filename displays, button enables
+- \[ \] Click "Restore" -> Confirmation dialog appears
+- \[ \] Cancel confirmation -> Operation aborted
+- \[ \] Confirm restoration -> Success message shows
 - \[ \] Page refreshes after 3 seconds
 - \[ \] Songs match backup content
 - \[ \] Stats update correctly
 
-#### Test 4: Error Handling
+#### Test 5: Error Handling
 
-- \[ \] Upload non-SQLite file → Error message shown
-- \[ \] Upload corrupted .db file → Error message shown
-- \[ \] Upload incompatible schema version → Error message shown
-- \[ \] Trigger sync while disk is full → Graceful error
-- \[ \] Trigger backup while disk is full → Graceful error
+- \[ \] Upload non-SQLite file -> Error message shown
+- \[ \] Upload corrupted .db file -> Error message shown
+- \[ \] Upload incompatible schema version -> Error message shown
+- \[ \] Trigger sync while disk is full -> Graceful error
+- \[ \] Trigger backup while disk is full -> Graceful error
+- \[ \] Trigger reset while disk is full -> Graceful error with recovery
+- \[ \] Trigger reset with locked database -> Graceful error handling
 
-#### Test 5: Mobile Responsiveness
+#### Test 6: Mobile Responsiveness
 
 - \[ \] UI works on phone (\< 480px width)
 - \[ \] UI works on tablet (481-768px width)
@@ -702,7 +967,7 @@ ______________________________________________________________________
 - \[ \] File upload works on mobile
 - \[ \] Collapsible sections work correctly
 
-#### Test 6: Security
+#### Test 7: Security
 
 - \[ \] All routes require admin login
 - \[ \] Non-admin redirected to login page
@@ -716,7 +981,7 @@ ______________________________________________________________________
 
 ### Functional
 
-- \[ \] All three features work correctly
+- \[ \] All four features work correctly (Sync, Reset, Backup, Restore)
 - \[ \] No data loss incidents
 - \[ \] Error handling is graceful
 - \[ \] User feedback is clear and actionable
@@ -771,11 +1036,11 @@ ______________________________________________________________________
 
 After Stage 3 completion:
 
-1. ✅ All manual tests pass
-2. ✅ User acceptance testing complete
-3. ✅ Security audit passed
-4. ✅ Documentation published
-5. 📝 (Optional) Proceed to Stage 4 (Metadata Enrichment)
+1. All manual tests pass
+2. User acceptance testing complete
+3. Security audit passed
+4. Documentation published
+5. (Optional) Proceed to Stage 4 (Metadata Enrichment)
 
 **Stage 3 Completion:** At this point, the database migration is **feature-complete** and production-ready. Stage 4 is an enhancement, not a requirement.
 
@@ -787,7 +1052,7 @@ ______________________________________________________________________
 
 **Backend:**
 
-- \[ \] Admin routes file - Add 4 new routes (sync, download, upload, stats)
+- \[ \] Admin routes file - Add 5 new routes (sync, reset, download, upload, stats)
 - \[ \] Ensure `@requires_admin` decorator exists
 
 **Frontend:**
@@ -802,6 +1067,6 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-**Document Status:** ✅ Complete
+**Document Status:**  Complete
 **Last Updated:** 2026-01-09
 **Ready for:** Implementation after Stage 2

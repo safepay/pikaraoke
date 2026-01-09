@@ -1,7 +1,7 @@
 # Stage 2: Read-Only Integration - Detailed Implementation Plan
 
 **Stage:** 2 of 4
-**Status:** 📋 Ready for Implementation (After Stage 1)
+**Status:**  Ready for Implementation (After Stage 1)
 **Prerequisites:** Stage 1 (Core Database Layer Complete)
 **Estimated Effort:** 0.5-1 day
 **Risk Level:** Low
@@ -27,22 +27,17 @@ ______________________________________________________________________
 During Stage 2, both systems will run in parallel:
 
 ```
-┌─────────────────────────────────────────┐
-│         Karaoke Application             │
-├─────────────────────────────────────────┤
-│                                         │
-│  ┌──────────────┐    ┌──────────────┐  │
-│  │ KaraokeDB    │    │  SongList    │  │
-│  │ (New, Primary)    │  (Legacy)    │  │
-│  └──────┬───────┘    └──────▲───────┘  │
-│         │                   │           │
-│         │  populate from    │           │
-│         └───────────────────┘           │
-│                                         │
-│  All existing routes query SongList    │
-│  (No changes to browse/search/queue)   │
-│                                         │
-└─────────────────────────────────────────┘
+
+         Karaoke Application
+
+   KaraokeDB          SongList
+   (New, Primary)      (Legacy)
+
+           populate from
+
+  All existing routes query SongList
+  (No changes to browse/search/queue)
+
 ```
 
 **Why This Approach?**
@@ -232,12 +227,12 @@ ______________________________________________________________________
 
 | Metric | Target | Actual | Pass/Fail |
 |--------|--------|--------|-----------|
-| Startup time (100 songs) | \< 5s | \_\_\_\_\_ | ☐ |
-| Startup time (1000 songs) | \< 15s | \_\_\_\_\_ | ☐ |
-| Browse page load | \< 1s | \_\_\_\_\_ | ☐ |
-| Search response | \< 500ms | \_\_\_\_\_ | ☐ |
-| Rescan (no changes) | \< 2s | \_\_\_\_\_ | ☐ |
-| Memory usage increase | \< 50MB | \_\_\_\_\_ | ☐ |
+| Startup time (100 songs) | \< 5s | \_\_\_\_\_ |  |
+| Startup time (1000 songs) | \< 15s | \_\_\_\_\_ |  |
+| Browse page load | \< 1s | \_\_\_\_\_ |  |
+| Search response | \< 500ms | \_\_\_\_\_ |  |
+| Rescan (no changes) | \< 2s | \_\_\_\_\_ |  |
+| Memory usage increase | \< 50MB | \_\_\_\_\_ |  |
 
 **How to measure:**
 
@@ -440,7 +435,7 @@ rm -f ~/.pikaraoke/pikaraoke.db*
 python -m pikaraoke.app &
 PID=$!
 sleep 10
-curl -s http://localhost:5555/files | grep -q "song" && echo "✓ Browse page works" || echo "✗ Browse page failed"
+curl -s http://localhost:5555/files | grep -q "song" && echo " Browse page works" || echo " Browse page failed"
 kill $PID
 
 # Test 2: Persistence
@@ -457,7 +452,7 @@ sleep 5
 curl -s http://localhost:5555/files > /tmp/after.html
 kill $PID
 
-diff /tmp/before.html /tmp/after.html && echo "✓ Songs persisted" || echo "✗ Songs changed after restart"
+diff /tmp/before.html /tmp/after.html && echo " Songs persisted" || echo " Songs changed after restart"
 
 # Test 3: File changes detection
 echo "[Test 3] File changes"
@@ -467,7 +462,7 @@ PID=$!
 sleep 10
 curl -s http://localhost:5555/admin/refresh
 sleep 2
-curl -s http://localhost:5555/files | grep -q "new_test_song" && echo "✓ New file detected" || echo "✗ New file not found"
+curl -s http://localhost:5555/files | grep -q "new_test_song" && echo " New file detected" || echo " New file not found"
 kill $PID
 rm ~/pikaraoke-songs/new_test_song.mp4
 
@@ -633,11 +628,11 @@ ______________________________________________________________________
 
 After Stage 2 completion:
 
-1. ✅ All validation tests pass
-2. ✅ Performance benchmarks met
-3. ✅ User acceptance testing complete
-4. ✅ Documentation updated
-5. 📝 Proceed to Stage 3 (Admin UI)
+1. All validation tests pass
+2. Performance benchmarks met
+3. User acceptance testing complete
+4. Documentation updated
+5. Proceed to Stage 3 (Admin UI)
 
 In Stage 3, we'll expose database features in the admin UI:
 

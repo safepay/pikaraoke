@@ -29,9 +29,9 @@ ______________________________________________________________________
 - Pure Python, Flask-based (matches existing stack)
 - Minimal dependencies
 - Web-based interface (consistent with PiKaraoke UI)
-- Read-only mode available for safety
+- Read-only mode for safety
 - Very lightweight (~200KB)
-- Conditionally loaded only when development flag is set
+- Optional dependency with graceful fallback
 
 ______________________________________________________________________
 
@@ -58,23 +58,23 @@ ______________________________________________________________________
 
 ## Usage
 
-### Starting PiKaraoke with Development Mode
+### Starting PiKaraoke
 
 ```bash
-# Enable development mode with the --dev-mode flag
-python -m pikaraoke --dev-mode
+# Start normally
+python -m pikaraoke
 
 # Or with other options
-python -m pikaraoke --dev-mode --port 5555 --download-path /path/to/songs
+python -m pikaraoke --port 5555 --download-path /path/to/songs
 ```
 
 ### Accessing the Database Viewer
 
-Once running with `--dev-mode`:
+Once running:
 
 1. Open your web browser
 2. Navigate to: `http://localhost:5555/dev/database`
-3. Authenticate with admin credentials (reuses existing `@is_admin` decorator)
+3. Authenticate with admin credentials (protected by existing `@is_admin` decorator)
 
 ______________________________________________________________________
 
@@ -113,20 +113,7 @@ ______________________________________________________________________
 
 ## Implementation
 
-### 1. Add `--dev-mode` Flag
-
-**File:** `pikaraoke/lib/args.py`
-
-```python
-parser.add_argument(
-    "--dev-mode",
-    action="store_true",
-    help="Enable development features (database viewer, debug logging, etc.)",
-    default=False,
-)
-```
-
-### 2. Integrate sqlite-web Blueprint
+### Integrate sqlite-web Blueprint
 
 **File:** `pikaraoke/app.py`
 
@@ -139,42 +126,39 @@ logger = logging.getLogger(__name__)
 
 # ... existing app initialization ...
 
-# Development-only features
-if args.dev_mode:
-    logger.warning("Development mode enabled - DO NOT USE IN PRODUCTION")
+# Database viewer (admin-only)
+try:
+    from sqlite_web import SqliteWebBlueprint
 
-    try:
-        from sqlite_web import SqliteWebBlueprint
+    db_path = os.path.join(get_data_directory(), "pikaraoke.db")
 
-        db_path = os.path.join(get_data_directory(), "pikaraoke.db")
+    # Only mount if database exists
+    if os.path.exists(db_path):
+        db_blueprint = SqliteWebBlueprint(
+            database=db_path,
+            name="dev_database",
+            read_only=True,  # Read-only for safety
+            extension=None,  # No custom extensions
+            password=None,  # Use existing auth
+        )
 
-        # Only mount if database exists
-        if os.path.exists(db_path):
-            db_blueprint = SqliteWebBlueprint(
-                database=db_path,
-                name="dev_database",
-                read_only=False,  # Allow modifications during development
-                extension=None,  # No custom extensions
-                password=None,  # Use existing auth
-            )
+        # Register blueprint with admin authentication
+        from pikaraoke.lib.current_app import is_admin
 
-            # Register blueprint with admin authentication
-            from pikaraoke.lib.current_app import is_admin
+        @db_blueprint.before_request
+        def require_admin():
+            if not is_admin():
+                from flask import redirect, url_for
 
-            @db_blueprint.before_request
-            def require_admin():
-                if not is_admin():
-                    from flask import redirect, url_for
+                return redirect(url_for("login"))
 
-                    return redirect(url_for("login"))
+        app.register_blueprint(db_blueprint, url_prefix="/dev/database")
+        logger.info("Database viewer enabled at /dev/database (admin only)")
+    else:
+        logger.warning(f"Database not found at {db_path}, skipping database viewer")
 
-            app.register_blueprint(db_blueprint, url_prefix="/dev/database")
-            logger.info("Development database viewer enabled at /dev/database")
-        else:
-            logger.warning(f"Database not found at {db_path}, skipping dev viewer")
-
-    except ImportError:
-        logger.warning("sqlite-web not installed. Run: uv add --dev sqlite-web")
+except ImportError:
+    logger.warning("sqlite-web not installed. Run: uv add --dev sqlite-web")
 ```
 
 ______________________________________________________________________
@@ -183,36 +167,28 @@ ______________________________________________________________________
 
 ### Multi-Layer Protection
 
-1. **Flag-Based Activation**
+1. **Authentication Required**
 
-   - Only available when `--dev-mode` flag is explicitly set
-   - Flag must be passed every time the application starts
-   - Default is OFF (secure by default)
-
-2. **Authentication Required**
-
-   - Reuses existing `@is_admin` decorator
+   - Protected by existing `@is_admin` decorator
    - Requires admin login before accessing viewer
    - Same authentication as other admin features
 
-3. **Production Safety**
+2. **Read-Only Mode**
 
-   - Never deployed to production (flag not passed)
-   - No performance impact when disabled
-   - Optional dependency (won't break if not installed)
+   - Database viewer configured as read-only by default
+   - Prevents accidental modifications through the UI
+   - Safe for end users with minimal risk
 
-4. **Clear Warnings**
+3. **Optional Dependency**
 
-   - Logs warning message when dev mode is enabled
-   - Reminds developers this is for development only
+   - Won't break if not installed
+   - Graceful fallback with warning log message
 
 ### Security Checklist
 
-- \[ \] `--dev-mode` flag defaults to False
 - \[ \] Admin authentication required before access
-- \[ \] Warning logged when dev mode is enabled
-- \[ \] Documentation clearly states "development only"
-- \[ \] Production deployment guides do not include `--dev-mode`
+- \[ \] Database viewer in read-only mode
+- \[ \] Optional dependency (graceful degradation)
 
 ______________________________________________________________________
 
@@ -331,8 +307,8 @@ ______________________________________________________________________
 
 1. **Write database code** in `karaoke_database.py`
 2. **Run unit tests** to validate logic
-3. **Start app with dev mode**: `python -m pikaraoke --dev-mode`
-4. **Open database viewer** at `/dev/database`
+3. **Start app**: `python -m pikaraoke`
+4. **Open database viewer** at `/dev/database` (login as admin)
 5. **Inspect results** of database operations
 6. **Execute test queries** to verify data integrity
 7. **Debug issues** by examining actual data
@@ -362,38 +338,31 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## Removal Before Deployment
+## Production Deployment
 
-### Development Builds
-
-```bash
-# Dev mode enabled for local testing
-python -m pikaraoke --dev-mode
-```
-
-### Production Builds
+### Standard Startup
 
 ```bash
-# No dev mode flag = no database viewer
+# Normal operation
 python -m pikaraoke
 
 # Or with production settings
 python -m pikaraoke --port 80 --download-path /var/lib/pikaraoke/songs
 ```
 
-### Verification
+### Availability
 
-The database viewer is completely inactive unless:
+The database viewer is available when:
 
-1. `sqlite-web` is installed (dev dependency)
-2. `--dev-mode` flag is explicitly passed
-3. Database file exists at expected path
+1. `sqlite-web` is installed (optional dependency)
+2. Database file exists at expected path
+3. User is logged in as admin
 
-**Production checklist:**
+**Production considerations:**
 
-- \[ \] No `--dev-mode` flag in startup scripts
-- \[ \] No `sqlite-web` in production dependencies
-- \[ \] `/dev/database` route returns 404 (not mounted)
+- \[ \] Database viewer is read-only (safe for end users)
+- \[ \] Admin authentication required
+- \[ \] Optional dependency (won't break if not installed)
 
 ______________________________________________________________________
 

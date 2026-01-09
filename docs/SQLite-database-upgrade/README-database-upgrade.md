@@ -1,18 +1,18 @@
 # PiKaraoke Database Upgrade - Documentation Index
 
 **Project:** SQLite Database Migration for PiKaraoke
-**Status:** 📋 Planning Complete - Ready for Stage 1 Implementation
+**Status:**  Planning Complete - Ready for Stage 1 Implementation
 **Last Updated:** 2026-01-09
 
 ______________________________________________________________________
 
-## 📚 Documentation Overview
+## Documentation Overview
 
 This directory contains the complete planning documentation for migrating PiKaraoke from an in-memory file scanning system to a persistent SQLite database with metadata enrichment and library management features.
 
 ______________________________________________________________________
 
-## 📖 Document Index
+## Document Index
 
 ### 1. Master Implementation Plan
 
@@ -33,7 +33,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-### 2. Stage 0: Context & Analysis ✅ COMPLETE
+### 2. Stage 0: Context & Analysis  COMPLETE
 
 **File:** [database-upgrade-stage0-analysis.md](database-upgrade-stage0-analysis.md)
 
@@ -48,11 +48,11 @@ ______________________________________________________________________
 - Admin UI location analysis (info.html)
 - Integration strategy
 
-**Status:** ✅ Complete - Decisions finalized
+**Status:**  Complete - Decisions finalized
 
 ______________________________________________________________________
 
-### 3. Stage 1: Core Database Layer 📋 NEXT
+### 3. Stage 1: Core Database Layer  NEXT
 
 **File:** [stage1-core-database.md](stage1-core-database.md)
 
@@ -120,9 +120,9 @@ ______________________________________________________________________
 
 **Features:**
 
-- 📊 Library status display
-- 🔄 Synchronize library button
-- 💾 Download/restore backup functionality
+- Library status display
+- Synchronize library button
+- Download/restore backup functionality
 
 **Estimated Effort:** 1-2 days
 
@@ -136,7 +136,7 @@ ______________________________________________________________________
 
 **Contents:**
 
-#### Phase 4A: Smart Filename Parsing ⭐ RECOMMENDED
+#### Phase 4A: Smart Filename Parsing  RECOMMENDED
 
 - Pattern-based extraction (Artist - Title, etc.)
 - YouTube ID detection
@@ -167,43 +167,43 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## 🗺️ Implementation Roadmap
+## Implementation Roadmap
 
 ```
-Stage 0: Analysis ───────────────────────────────────────> ✅ COMPLETE
+Stage 0: Analysis >  COMPLETE
 
-Stage 1: Core Database ──────────────────────────────────> 📋 NEXT
-         │
-         ├─ Create karaoke_database.py
-         ├─ Implement scan/backup/restore
-         ├─ Write unit tests
-         └─ Validate in isolation
+Stage 1: Core Database >  NEXT
 
-Stage 2: Integration ────────────────────────────────────> 📋 PLANNED
-         │
-         ├─ Initialize DB in Karaoke.__init__()
-         ├─ Populate SongList from DB
-         ├─ Test browse/search/queue
-         └─ Validate 100% compatibility
+          Create karaoke_database.py
+          Implement scan/backup/restore
+          Write unit tests
+          Validate in isolation
 
-Stage 3: Admin UI ───────────────────────────────────────> 📋 PLANNED
-         │
-         ├─ Create Flask routes
-         ├─ Update info.html template
-         ├─ Add JavaScript handlers
-         ├─ Test backup/restore workflow
-         └─ Security audit
+Stage 2: Integration >  PLANNED
 
-Stage 4: Metadata (Optional) ────────────────────────────> 📋 PLANNED
-         │
-         ├─ Phase 4A: Filename parsing ⭐
-         ├─ Phase 4C: Manual editor UI ⭐
-         └─ Phase 4B: External APIs (defer)
+          Initialize DB in Karaoke.__init__()
+          Populate SongList from DB
+          Test browse/search/queue
+          Validate 100% compatibility
+
+Stage 3: Admin UI >  PLANNED
+
+          Create Flask routes
+          Update info.html template
+          Add JavaScript handlers
+          Test backup/restore workflow
+          Security audit
+
+Stage 4: Metadata (Optional) >  PLANNED
+
+          Phase 4A: Filename parsing
+          Phase 4C: Manual editor UI
+          Phase 4B: External APIs (defer)
 ```
 
 ______________________________________________________________________
 
-## 🎯 Quick Start Guide
+## Quick Start Guide
 
 ### For Reviewers
 
@@ -224,15 +224,15 @@ ______________________________________________________________________
 
 After deployment, you'll gain:
 
-- ✅ Persistent song library (no rescanning on restart)
-- ✅ Move/rename detection (songs don't disappear when files move)
-- ✅ Backup/restore (export your library for safekeeping)
-- ✅ Better search (full-text search across metadata)
-- ✅ (Optional) Rich metadata (artist, year, genre)
+- Persistent song library (no rescanning on restart)
+- Move/rename detection (songs don't disappear when files move)
+- Backup/restore (export your library for safekeeping)
+- Better search (full-text search across metadata)
+- (Optional) Rich metadata (artist, year, genre)
 
 ______________________________________________________________________
 
-## 📋 Key Decisions Summary
+## Key Decisions Summary
 
 | Decision | Resolution | Rationale |
 |----------|-----------|-----------|
@@ -244,11 +244,11 @@ ______________________________________________________________________
 | **Hash algorithm** | SHA256 | Better collision resistance than MD5 |
 | **Journal mode** | WAL (Write-Ahead Logging) | Crash safety, concurrent reads |
 | **Migration strategy** | Coexistence (DB + SongList) | Zero breaking changes |
-| **Metadata approach** | Filename parsing → External API → Manual | Progressive enhancement |
+| **Metadata approach** | Filename parsing -> External API -> Manual | Progressive enhancement |
 
 ______________________________________________________________________
 
-## ⚠️ Critical Bugs Fixed
+## Critical Bugs Fixed
 
 The reference implementation (`database_upgrade.py`) had several critical bugs that have been identified and fixed in the planning documents:
 
@@ -262,7 +262,7 @@ All fixes are incorporated into Stage 1 implementation plan.
 
 ______________________________________________________________________
 
-## 🧪 Testing Strategy
+## Testing Strategy
 
 ### Unit Tests (Stage 1)
 
@@ -299,26 +299,26 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## 🔒 Security Considerations
+## Security Considerations
 
 ### Stage 3 (Admin UI)
 
-- ✅ Admin authentication required for all routes
-- ✅ File upload validation (extension, size, format)
-- ✅ Path traversal prevention (`secure_filename`)
-- ✅ CSRF protection
-- ✅ User-friendly error messages (no technical details exposed)
+- Admin authentication required for all routes
+- File upload validation (extension, size, format)
+- Path traversal prevention (`secure_filename`)
+- CSRF protection
+- User-friendly error messages (no technical details exposed)
 
 ### Stage 4 (External APIs)
 
-- ✅ API key stored securely (environment variable)
-- ✅ Rate limiting to prevent bans
-- ✅ Response caching to reduce API calls
-- ✅ Error handling for API failures
+- API key stored securely (environment variable)
+- Rate limiting to prevent bans
+- Response caching to reduce API calls
+- Error handling for API failures
 
 ______________________________________________________________________
 
-## 🚀 Deployment Checklist
+## Deployment Checklist
 
 ### Pre-Stage 1
 
@@ -346,7 +346,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## 📊 Success Metrics
+## Success Metrics
 
 ### Technical Metrics
 
@@ -364,7 +364,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## 🔄 Rollback Strategy
+## Rollback Strategy
 
 Each stage has a documented rollback plan:
 
@@ -392,7 +392,7 @@ Each stage has a documented rollback plan:
 
 ______________________________________________________________________
 
-## 📞 Support & Questions
+## Support & Questions
 
 ### During Planning Phase
 
@@ -414,7 +414,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## 🎓 Lessons Learned (Post-Implementation)
+## Lessons Learned (Post-Implementation)
 
 *This section will be updated after each stage is completed*
 
@@ -436,7 +436,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## 📝 Version History
+## Version History
 
 | Version | Date | Changes |
 |---------|------|---------|
@@ -448,7 +448,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## 📖 Related Documentation
+## Related Documentation
 
 - [PiKaraoke Main README](../README.md)
 - [Contributing Guide](../CONTRIBUTING.md) *(if exists)*
@@ -457,10 +457,10 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-**Status:** 📋 Planning Complete - Awaiting Stage 1 Implementation
+**Status:**  Planning Complete - Awaiting Stage 1 Implementation
 **Next Action:** Review and approve Stage 1 plan, then begin implementation
 **Estimated Total Effort:** 5-8 days (Stages 1-4)
-**Critical Path:** Stages 1 → 2 → 3 (Stage 4 optional)
+**Critical Path:** Stages 1 -> 2 -> 3 (Stage 4 optional)
 
 ______________________________________________________________________
 

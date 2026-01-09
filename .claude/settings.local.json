@@ -7,9 +7,13 @@
       "Bash(find:*)",
       "Bash(mkdir:*)",
       "Bash(cp:*)",
-      "Bash(dir /s /b \"c:\\\\Users\\\\Richard\\\\Documents\\\\pikaraoke\\\\build\\\\ffmpeg\")",
+      "Bash(dir:*)",
       "Bash(uv run python:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(python scriptssimplify_docs.py)",
+      "Bash(python scripts/simplify_docs.py:*)",
+      "Bash(grep:*)",
+      "Bash(pre-commit run:*)"
     ]
   }
 }
