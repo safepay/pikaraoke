@@ -547,12 +547,40 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
+## Existing UI Integration 🎨
+
+**CRITICAL:** PiKaraoke already has a LastFM suggestion UI ([edit.html:72-97](pikaraoke/templates/edit.html#L72-L97)) that should be **preserved and enhanced**, not replaced.
+
+**Current Features:**
+
+- Auto-format button (strips karaoke markers)
+- Swap artist/song order button
+- "Suggest from Last.fm" - queries API and shows 5 suggestions
+
+**Enhancement Plan:**
+
+1. **Port JavaScript `clean_title()` to Python** - Reuse in `YouTubeKaraokeMetadataParser`
+2. **Auto-populate on edit page load** - Use parser to pre-fill artist/title fields
+3. **Auto-trigger LastFM suggestions** - If confidence >= 0.60, automatically query API
+4. **Show confidence indicator** - Display score and meaning to user
+5. **Preserve manual override** - Users can still manually edit or re-query
+
+**Benefits:**
+
+- ✅ Familiar UX for existing users
+- ✅ Less manual work (auto-populated fields)
+- ✅ Consistent parsing logic across app
+- ✅ Power users retain full control
+
+______________________________________________________________________
+
 ## Next Steps
 
 1. ✅ Review updated Stage 4 document
 2. 📝 Approve background worker approach
 3. 📝 Approve confidence scoring design
-4. 🚀 Begin implementation (after Stages 1-3)
+4. 📝 Approve existing UI enhancement approach
+5. 🚀 Begin implementation (after Stages 1-3)
 
 ______________________________________________________________________
 

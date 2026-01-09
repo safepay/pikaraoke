@@ -1137,13 +1137,103 @@ def enrich_from_lastfm(self, api_key: str, batch_size: int = 100):
 
 ______________________________________________________________________
 
-### Phase 4C: Manual UI Editor 🛠️ ESSENTIAL FALLBACK
+### Phase 4C: Enhanced Manual UI Editor 🛠️ ESSENTIAL FALLBACK
 
 **Risk:** Low
 **Impact:** Medium
-**Effort:** Medium
+**Effort:** Low (reuses existing UI + new parser)
 
-**Goal:** Allow users to manually edit metadata for songs that couldn't be auto-enriched.
+**Goal:** Preserve and enhance existing LastFM suggestion UI, allowing users to manually edit metadata for songs that couldn't be auto-enriched.
+
+**IMPORTANT:** PiKaraoke ALREADY has a LastFM suggestion feature in [edit.html](pikaraoke/templates/edit.html#L74-L96). This should be preserved and enhanced with the new parsing logic.
+
+#### Existing LastFM UI Integration (To Be Enhanced)
+
+**Current Implementation** ([edit.html:72-97](pikaraoke/templates/edit.html#L72-L97)):
+
+The existing UI provides:
+
+- ✅ **Auto-format button** - Strips karaoke markers from filename
+- ✅ **Swap artist/song order** - Reverses "Artist - Title" to "Title - Artist"
+- ✅ **Suggest from Last.fm** - Queries LastFM API and presents 5 suggestions
+
+**Current `clean_title()` Function** ([edit.html:41-70](pikaraoke/templates/edit.html#L41-L70)):
+
+```javascript
+function clean_title(search_str, title_case = false) {
+    // Removes: "karaoke", "made famous by", "in the style of", etc.
+    var uselessWordsArray = [
+        "as popularized by", "lyrics", "karafun", "instrumental",
+        "minus one", "minusone", "made famous by", " by ",
+        "karaoke version", "karaoke", "hd", "hq", "coversph",
+        "singkaraoke", "in the style of", "no lead vocal",
+        "with lyrics", "cc"
+    ];
+    // ... removes these phrases and cleans up formatting
+}
+```
+
+**Enhancement Strategy:**
+
+1. **Reuse `clean_title()` logic in Python** - Port JavaScript cleaning logic to `YouTubeKaraokeMetadataParser`
+2. **Pre-populate suggestions** - Use parsed artist/title to call LastFM API automatically on edit page load
+3. **Show confidence score** - Display confidence level to guide users ("High Confidence - may not need editing")
+4. **Preserve manual override** - Allow users to click "Suggest from Last.fm" to re-query with different terms
+
+**Enhanced Flow:**
+
+```
+User clicks "Edit" on song → Edit page loads
+  ↓
+Backend: Parse filename with YouTubeKaraokeMetadataParser
+  ↓ Returns: artist="Oasis", title="Wonderwall", confidence=0.60
+  ↓
+Frontend: Pre-populate form fields
+  ↓
+Display: "Artist: Oasis | Title: Wonderwall | Confidence: 60% (Medium)"
+  ↓
+Automatically call LastFM API with parsed values
+  ↓
+Display suggestions: [Oasis - Wonderwall, Oasis - Wonderwall (Remastered), ...]
+  ↓
+User selects suggestion OR manually edits OR clicks "Suggest again"
+```
+
+**Code Changes Required:**
+
+1. **Backend** - New route endpoint:
+
+```python
+@files_bp.route("/api/parse_filename", methods=["POST"])
+def parse_filename():
+    """Parse filename and return metadata suggestions."""
+    filename = request.json.get("filename")
+    parser = YouTubeKaraokeMetadataParser()
+    result = parser.parse_filename(filename)
+    return jsonify(result)
+```
+
+2. **Frontend** - Enhanced edit.html:
+
+```javascript
+// On page load, parse filename and pre-populate
+$(function() {
+    var filename = $('#new_file_name').val();
+    $.post('/files/api/parse_filename', {filename: filename}, function(data) {
+        if (data.confidence >= 0.60) {
+            // Auto-suggest if medium+ confidence
+            suggest_title(data.title + ' ' + (data.artist || ''), "#suggest_results");
+        }
+    });
+});
+```
+
+**Benefits:**
+
+- ✅ **Preserves existing UX** - Users familiar with current UI see improvements, not changes
+- ✅ **Reduces manual work** - Auto-populates based on intelligent parsing
+- ✅ **Reuses parsing logic** - Same `YouTubeKaraokeMetadataParser` used everywhere
+- ✅ **Still allows manual override** - Power users can edit/re-search as needed
 
 #### Use Cases for Manual Editing
 
@@ -1151,6 +1241,7 @@ ______________________________________________________________________
 2. **External API returned wrong data** (common with cover songs)
 3. **User has custom/local recordings** (not in Last.FM database)
 4. **User wants to correct/customize** metadata
+5. **Low confidence enrichment** (\< 0.70) - User verifies/corrects automatically suggested metadata
 
 #### UI Design: "Edit Song Metadata" Modal
 
