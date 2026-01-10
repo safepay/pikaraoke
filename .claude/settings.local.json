@@ -13,7 +13,10 @@
       "Bash(python scriptssimplify_docs.py)",
       "Bash(python scripts/simplify_docs.py:*)",
       "Bash(grep:*)",
-      "Bash(pre-commit run:*)"
+      "Bash(pre-commit run:*)",
+      "Bash(wc:*)",
+      "Bash(mdformat --check:*)",
+      "Bash(python -m mdformat:*)"
     ]
   }
 }
