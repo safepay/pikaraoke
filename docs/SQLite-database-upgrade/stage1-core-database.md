@@ -189,6 +189,56 @@ def get_fingerprint(file_path: str) -> str | None:
         return None
 ```
 
+## YouTube ID Extraction
+
+**Purpose:** Extract YouTube video IDs from yt-dlp downloaded filenames to maintain current searchability.
+
+**PiKaraoke Pattern:** `Song Title---youtube_id.mp4`
+**yt-dlp Default Pattern:** `Song Title [youtube_id].mp4`
+
+```python
+from __future__ import annotations
+
+import os
+import re
+
+
+def extract_youtube_id(filename: str) -> str | None:
+    """Extract YouTube ID from yt-dlp downloaded filename.
+
+    Supports two patterns:
+    - PiKaraoke: "Song Title---dQw4w9WgXcQ.mp4"
+    - yt-dlp default: "Song Title [dQw4w9WgXcQ].mp4"
+
+    Args:
+        filename: Song filename (with or without extension)
+
+    Returns:
+        YouTube ID (11 characters) or None if not found
+    """
+    clean = os.path.splitext(filename)[0]
+
+    # Pattern 1: PiKaraoke format (triple dash)
+    match = re.search(r"---([A-Za-z0-9_-]{11})$", clean)
+    if match:
+        return match.group(1)
+
+    # Pattern 2: yt-dlp default format (brackets)
+    match = re.search(r"\[([A-Za-z0-9_-]{11})\]$", clean)
+    if match:
+        return match.group(1)
+
+    return None
+```
+
+**Examples:**
+
+```python
+extract_youtube_id("Queen - We Will Rock You---dQw4w9WgXcQ.mp4")  # "dQw4w9WgXcQ"
+extract_youtube_id("Bohemian Rhapsody [abc123defgh].mp4")  # "abc123defgh"
+extract_youtube_id("Song With No ID.mp4")  # None
+```
+
 ## Scan Library Algorithm
 
 **Goal:** Synchronize database with disk, detecting adds/moves/deletes/updates.
@@ -207,14 +257,15 @@ def scan_library(self, songs_dir: str) -> dict[str, int]:
         Stats dict: added, moved, deleted, updated
     """
     # 1. Discover files on disk
-    disk_files = {}  # {rel_path: (filename, format, hash)}
+    disk_files = {}  # {rel_path: (filename, format, hash, youtube_id)}
     for file in walk(songs_dir):
         if is_valid_song(file):
             format = detect_format(file, files_in_same_dir)
             if format:
                 rel_path = relative_path(file, songs_dir)
                 hash = get_fingerprint(file)
-                disk_files[rel_path] = (filename, format, hash)
+                youtube_id = extract_youtube_id(filename)
+                disk_files[rel_path] = (filename, format, hash, youtube_id)
 
     # 2. Fetch database state
     db_rows = fetch_all_from_db()  # {file_path: row}
@@ -229,11 +280,22 @@ def scan_library(self, songs_dir: str) -> dict[str, int]:
 
     # 4. Update existing files
     for path in common_paths:
-        disk_filename, disk_format, disk_hash = disk_files[path]
+        disk_filename, disk_format, disk_hash, disk_youtube_id = disk_files[path]
         db_row = db_rows[path]
 
-        if disk_hash != db_row["file_hash"] or disk_format != db_row["format"]:
-            update_song(db_row["id"], hash=disk_hash, format=disk_format)
+        needs_update = (
+            disk_hash != db_row["file_hash"]
+            or disk_format != db_row["format"]
+            or disk_youtube_id != db_row["youtube_id"]
+        )
+
+        if needs_update:
+            update_song(
+                db_row["id"],
+                hash=disk_hash,
+                format=disk_format,
+                youtube_id=disk_youtube_id,
+            )
             stats["updated"] += 1
 
     # 5. Detect moves vs deletes
@@ -246,16 +308,21 @@ def scan_library(self, songs_dir: str) -> dict[str, int]:
     moved_paths = set()
 
     for new_path in new_paths:
-        new_filename, new_format, new_hash = disk_files[new_path]
+        new_filename, new_format, new_hash, new_youtube_id = disk_files[new_path]
 
         if new_hash and new_hash in missing_by_hash:
             old_row = missing_by_hash[new_hash]
-            update_song(old_row["id"], file_path=new_path, filename=new_filename)
+            update_song(
+                old_row["id"],
+                file_path=new_path,
+                filename=new_filename,
+                youtube_id=new_youtube_id,
+            )
             moved_paths.add(new_path)
             del missing_by_hash[new_hash]
             stats["moved"] += 1
         else:
-            insert_song(new_path, new_filename, new_format, new_hash)
+            insert_song(new_path, new_filename, new_format, new_hash, new_youtube_id)
             stats["added"] += 1
 
     # 6. Delete truly missing files
@@ -521,6 +588,12 @@ class TestKaraokeDatabase:
     def test_scan_detects_updates(self):
         """Test detecting content changes."""
 
+    def test_youtube_id_extraction(self):
+        """Test YouTube ID extraction from filenames."""
+
+    def test_youtube_id_storage(self):
+        """Test YouTube IDs are stored during scan."""
+
     def test_cdg_pairing(self):
         """Test CDG format detection."""
 
@@ -567,9 +640,11 @@ class TestKaraokeDatabase:
 - Database initializes with correct schema
 - WAL mode enabled
 - `scan_library()` returns accurate stats
-- New files added correctly
+- New files added correctly with YouTube IDs extracted
 - Moved files detected (not deleted+added)
 - Deleted files removed
+- YouTube IDs extracted from filenames during scan
+- YouTube IDs stored in database and included in search blob
 - CDG/ASS pairs detected correctly
 - Hash generation fast (\< 50ms per file)
 - Backup files valid

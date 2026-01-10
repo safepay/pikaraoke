@@ -6,6 +6,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 PiKaraoke is a "KTV"-style karaoke system that runs on Raspberry Pi, Windows, macOS, and Linux. It provides a web interface for searching YouTube, queuing songs, and playing karaoke videos with features like pitch shifting, background music, and real-time streaming.
 
+### Filename Conventions
+
+PiKaraoke uses yt-dlp to download karaoke videos from YouTube. Files follow strict naming patterns:
+
+**PiKaraoke Format (Explicit):**
+
+```
+Song Title---dQw4w9WgXcQ.mp4
+Artist - Song Title---abc123defgh.cdg
+```
+
+**yt-dlp Default Format:**
+
+```
+Song Title [dQw4w9WgXcQ].mp4
+Artist - Song Title [abc123defgh].mkv
+```
+
+**Rules:**
+
+- YouTube IDs are **exactly 11 characters**: `[A-Za-z0-9_-]{11}`
+- PiKaraoke uses **triple dash** (`---`) before the YouTube ID
+- yt-dlp default uses **brackets** (`[]`) around the YouTube ID
+- **NEVER** implement support for hypothetical formats that don't exist from yt-dlp downloads
+- **ONLY** support these two patterns when extracting YouTube IDs from filenames
+
 ## Single-Owner Maintainability Philosophy
 
 This project is maintained by a single code owner. All code and documentation decisions prioritize:
