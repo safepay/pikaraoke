@@ -67,9 +67,11 @@ def scan_directory(self, directory: str) -> int:
 ## Function Design
 
 - **MUST** keep functions focused on a single responsibility
+- **MUST** keep code simple and maintainable by a single code owner
 - **NEVER** use mutable objects (lists, dicts) as default argument values
 - Limit function parameters to 5 or fewer
 - Return early to reduce nesting
+- Favor brevity: prefer concise, readable implementations over verbose code
 
 ## Class Design
 
@@ -95,6 +97,7 @@ def scan_directory(self, directory: str) -> int:
 
 - **MUST** avoid wildcard imports (`from module import *`)
 - **MUST** document dependencies in `pyproject.toml`
+- **MUST** prefer well-maintained libraries over custom implementations when appropriate
 - Use `uv` for fast package management and dependency resolution
 - Organize imports: standard library, third-party, local imports
 - Use `isort` to automate import formatting
