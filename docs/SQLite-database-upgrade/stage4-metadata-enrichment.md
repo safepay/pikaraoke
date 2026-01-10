@@ -84,7 +84,7 @@ random_filename_123.zip
 
 **Challenge:** Not just "Artist - Title" vs "Title - Artist", but:
 
-1. Extract YouTube ID
+1. Strip YouTube ID suffix (already extracted in Stage 1)
 2. Strip karaoke markers
 3. Extract artist from copyright phrases
 4. Handle remaining ambiguity
@@ -155,14 +155,15 @@ ON songs(queued_for_enrichment, enrichment_priority DESC, updated_at);
 
 ### Phase 4A: Filename Parsing (START HERE)
 
-**Goal:** Extract metadata from filenames with multi-stage parsing.
+**Goal:** Extract artist/title metadata from filenames with multi-stage parsing.
+
+**Note:** YouTube IDs are already extracted and stored during Stage 1 scan. Phase 4A focuses on artist/title extraction only.
 
 **Parsing stages:**
 
-1. Extract YouTube ID (`---ID` or `[ID]` format)
-2. Extract artist from copyright phrases (high confidence)
-3. Strip karaoke markers
-4. Parse remaining with ambiguity detection
+1. Extract artist from copyright phrases (high confidence)
+2. Strip karaoke markers and YouTube ID suffix
+3. Parse remaining with ambiguity detection
 
 **Implementation:**
 
@@ -203,27 +204,25 @@ class YouTubeKaraokeMetadataParser:
 
     @staticmethod
     def parse_filename(filename: str) -> dict[str, str | None]:
-        """Parse filename into metadata fields.
+        """Parse filename into artist/title metadata.
+
+        Note: YouTube ID is already extracted during Stage 1 scan and stored
+        in the database. This parser focuses on artist/title extraction only.
 
         Args:
             filename: Song filename
 
         Returns:
-            Dict with artist, title, year, variant, youtube_id, metadata_status
+            Dict with artist, title, year, variant, metadata_status
         """
         clean = os.path.splitext(filename)[0]
-        youtube_id = None
         artist = None
         title = None
         has_explicit_artist = False
 
-        # Stage 1: Extract YouTube ID
+        # Stage 1: Strip YouTube ID suffix (already in database)
         for pattern in YouTubeKaraokeMetadataParser.YOUTUBE_ID_PATTERNS:
-            match = re.search(pattern, clean, re.IGNORECASE)
-            if match:
-                youtube_id = match.group(1)
-                clean = re.sub(pattern, "", clean).strip()
-                break
+            clean = re.sub(pattern, "", clean, flags=re.IGNORECASE).strip()
 
         # Stage 2: Check for copyright phrases (explicit artist)
         for pattern_def in YouTubeKaraokeMetadataParser.COPYRIGHT_PATTERNS:
@@ -239,7 +238,7 @@ class YouTubeKaraokeMetadataParser:
             for marker in YouTubeKaraokeMetadataParser.KARAOKE_MARKERS:
                 clean = re.sub(marker, "", clean, flags=re.IGNORECASE).strip()
 
-        # Stage 4: Parse remaining (ambiguous)
+        # Stage 4: Parse remaining artist/title (ambiguous)
         if not has_explicit_artist and clean:
             if " - " in clean:
                 parts = clean.split(" - ", 1)
@@ -260,7 +259,6 @@ class YouTubeKaraokeMetadataParser:
         return {
             "artist": artist,
             "title": title or clean or filename,
-            "youtube_id": youtube_id,
             "metadata_status": metadata_status,
             "has_explicit_artist": has_explicit_artist,
         }
@@ -275,13 +273,15 @@ import logging
 
 
 def enrich_from_filenames(self):
-    """Parse filenames and populate metadata.
+    """Parse filenames and populate artist/title metadata.
+
+    Note: YouTube IDs are already extracted and stored during Stage 1 scan.
 
     Returns:
         Number of songs updated
     """
     cursor = self.conn.execute(
-        "SELECT id, filename FROM songs WHERE metadata_status = 'fallback'"
+        "SELECT id, filename, youtube_id FROM songs WHERE metadata_status = 'pending'"
     )
 
     updated = 0
@@ -290,6 +290,7 @@ def enrich_from_filenames(self):
     for row in cursor.fetchall():
         song_id = row["id"]
         filename = row["filename"]
+        youtube_id = row["youtube_id"]
 
         parsed = parser.parse_filename(filename)
 
@@ -300,7 +301,6 @@ def enrich_from_filenames(self):
             UPDATE songs
             SET artist = ?,
                 title = ?,
-                youtube_id = ?,
                 search_blob = ?,
                 metadata_status = ?,
                 queued_for_enrichment = ?,
@@ -310,8 +310,9 @@ def enrich_from_filenames(self):
             (
                 parsed["artist"],
                 parsed["title"],
-                parsed["youtube_id"],
-                self.build_search_blob(filename, parsed["title"], parsed["artist"]),
+                self.build_search_blob(
+                    filename, parsed["title"], parsed["artist"], youtube_id
+                ),
                 parsed["metadata_status"],
                 1 if needs_api else 0,
                 song_id,

@@ -119,12 +119,13 @@
 
 ### Phase 4A: Filename Parsing (Required)
 
+**Note:** YouTube IDs are already extracted during Stage 1 scan.
+
 1. Add parsing functions to `KaraokeDatabase`:
    - `_parse_filename()` - Extract artist/title from patterns
-   - `_detect_youtube_id()` - Identify YouTube video IDs
    - `_detect_variant()` - Identify karaoke/live/acoustic variants
-2. Call parsing during `scan_library()` to populate metadata fields
-3. Update `search_blob` generation to include parsed metadata
+2. Call parsing during metadata enrichment to populate artist/title fields
+3. `search_blob` already includes YouTube IDs from Stage 1
 
 ### Phase 4B: External API Enrichment (Enhances 4A)
 
@@ -142,7 +143,7 @@
 **Validation Checkpoint:**
 
 - \[ \] Filename parser extracts artist/title from common patterns
-- \[ \] YouTube IDs detected and stored
+- \[ \] YouTube IDs already stored from Stage 1 scan
 - \[ \] Enrichment is optional and non-blocking
 - \[ \] Failed lookups handled gracefully
 - \[ \] Manual editor saves changes correctly
