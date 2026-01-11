@@ -247,21 +247,22 @@ This implementation is **explicitly designed to be lightweight** and will:
 
 ### Proposed Solution (Working)
 
-- Click thumbnail → AJAX call to `/preview/stream/<video_id>`
-- Backend runs yt-dlp with `--print url` to extract direct stream URL (no download)
-- yt-dlp uses browser cookies if configured via `--ytdl-args` (same as downloads)
-- Return stream URL to frontend
-- Load URL into HTML5 `<video>` element (bypasses iframe restrictions)
-- Add "Open in YouTube" button linking to `https://www.youtube.com/watch?v={video_id}`
-- In-memory cache for stream URLs (TTL: 1 hour)
+**Minimal approach - ~100 lines of code total:**
 
-## Implementation Plan
+1. Add simple route `/preview/stream/<video_id>` that runs: `yt-dlp --print url -f worst <video_url>`
+2. Return JSON with stream URL
+3. Frontend: replace `iframe` with `<video>` element, set `src` to stream URL
+4. Add "Open in YouTube" link in modal
 
-### Phase 1: Backend Foundation
+**That's it.** No cache needed (YouTube URLs work for hours), minimal code to maintain.
 
-#### 1.1 Preview Cache Class
+## Simplified Implementation Plan
 
-**File**: `pikaraoke/lib/preview_cache.py` (new file)
+### Step 1: Add Backend Route (~30 lines)
+
+**File**: `pikaraoke/routes/search.py`
+
+Add one simple route
 
 ```python
 from __future__ import annotations
