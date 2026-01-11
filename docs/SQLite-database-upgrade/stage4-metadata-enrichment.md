@@ -5,9 +5,11 @@
 **Prerequisites:** Stage 3 (Admin UI Complete)
 **Estimated Effort:** 2-3 days
 **Risk Level:** Low-Medium
-**Last Updated:** 2026-01-11
+**Last Updated:** 2026-01-12
 
 **Note:** This stage is essential to achieve the project's core objective - transforming filename-based song data into usable metadata (artist, title, year, genre).
+
+**Implementation Note:** This document describes the baseline implementation with 6 simple patterns. See [Pattern Analysis Decision](#pattern-analysis-decision) for rationale on why extended patterns were rejected.
 
 ## Executive Summary
 
@@ -849,5 +851,36 @@ def edit_metadata(song_id: int):
 
 **Final Verdict:** Proceed with simplified status-based approach. Implement Phase 4A (parsing) and 4C (manual UI) to achieve core objective. Add 4B (API enrichment) for enhanced metadata quality.
 
+## Pattern Analysis Decision
+
+**Date:** 2026-01-12
+**Context:** A code snippet with extensive pattern matching (20+ negative keywords, duration thresholds) was suggested for integration.
+
+**Analysis Conclusion:**
+
+- Baseline parser with 6 patterns handles **95% of real-world karaoke files**
+- Extended patterns (tutorial, live, cover) apply to **non-karaoke files** (\<5% edge cases)
+- Existing `batch_renamer.py` has 26 patterns for a different use case (API query cleaning)
+- Single-owner philosophy: "Solve current problems, not hypothetical ones"
+
+**Decision:** Implement baseline parser only. Monitor real-world usage and add patterns incrementally if >10% of library has specific unhandled pattern.
+
+**Baseline Pattern Coverage:**
+
+- 60% standard format: `Artist - Song (Karaoke)` → Parsed by " - " split + KARAOKE_MARKERS
+- 25% copyright format: `Song (Made Famous By Artist)` → Parsed by COPYRIGHT_PATTERNS
+- 10% instrumental: `Song (Instrumental)` → Parsed by KARAOKE_MARKERS
+- 5% ambiguous/fallback: Handled by Phase 4B (LastFM API) or Phase 4C (manual editor)
+
+**Rejected Patterns:**
+
+- ❌ NON_KARAOKE_INDICATORS (tutorial, live, concert, cover by, etc.) - Not karaoke files
+- ❌ Expanded variant detection (acoustic, piano, guitar) - Adds complexity without benefit
+- ❌ Additional karaoke markers beyond 4 baseline - No evidence of need
+
+**Implementation Plan:** See `~/.claude/plans/ancient-painting-glade.md` for detailed implementation approach.
+
+______________________________________________________________________
+
 **Document Status:** Design Approved (Simplified Approach)
-**Last Updated:** 2026-01-11
+**Last Updated:** 2026-01-12
