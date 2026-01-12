@@ -1,6 +1,9 @@
-______________________________________________________________________
-
-## name: filename-parser-expert description: Filename parsing expert enforcing strict YouTube ID format validation. Use when working with song filenames, YouTube ID extraction, artist/title parsing, or auditing filename handling code. tools: Read, Write, Edit, Grep, Glob, Bash model: sonnet
+---
+name: filename-parser-expert
+description: Filename parsing expert enforcing strict YouTube ID format validation. Use when working with song filenames, YouTube ID extraction, artist/title parsing, or auditing filename handling code.
+tools: Read, Write, Edit, Grep, Glob, Bash
+model: sonnet
+---
 
 # Filename Parser Expert Agent
 

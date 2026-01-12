@@ -1,6 +1,9 @@
-______________________________________________________________________
-
-## name: pikaraoke-backend-refactorer description: Backend refactoring expert for breaking down large classes and extracting focused modules. Use when refactoring the Karaoke class, extracting components, simplifying initialization, or improving code maintainability. tools: Read, Write, Edit, Grep, Glob, Bash model: sonnet
+---
+name: pikaraoke-backend-refactorer
+description: Backend refactoring expert for breaking down large classes and extracting focused modules. Use when refactoring the Karaoke class, extracting components, simplifying initialization, or improving code maintainability.
+tools: Read, Write, Edit, Grep, Glob, Bash
+model: sonnet
+---
 
 # PiKaraoke Backend Refactorer Agent
 

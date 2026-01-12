@@ -1,6 +1,9 @@
-______________________________________________________________________
-
-## name: sqlite-backend-engineer description: SQLite database expert for schema design, migrations, and database implementation. Use when working on database tables, queries, indexing, backup/restore, or the SQLite migration project. tools: Read, Write, Edit, Grep, Glob, Bash model: sonnet
+---
+name: sqlite-backend-engineer
+description: SQLite database expert for schema design, migrations, and database implementation. Use when working on database tables, queries, indexing, backup/restore, or the SQLite migration project.
+tools: Read, Write, Edit, Grep, Glob, Bash
+model: sonnet
+---
 
 # SQLite Backend Engineer Agent
 

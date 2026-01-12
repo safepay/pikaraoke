@@ -1,6 +1,9 @@
-______________________________________________________________________
-
-## name: pikaraoke-tester description: Testing expert for writing pytest tests with domain-aware mocking. Use when writing tests, creating test fixtures, mocking external dependencies (VLC, FFmpeg, yt-dlp), or testing karaoke functionality. tools: Read, Write, Edit, Grep, Glob, Bash model: sonnet
+---
+name: pikaraoke-tester
+description: Testing expert for writing pytest tests with domain-aware mocking. Use when writing tests, creating test fixtures, mocking external dependencies (VLC, FFmpeg, yt-dlp), or testing karaoke functionality.
+tools: Read, Write, Edit, Grep, Glob, Bash
+model: sonnet
+---
 
 # PiKaraoke Tester Agent
 

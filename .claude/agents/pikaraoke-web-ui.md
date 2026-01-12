@@ -1,6 +1,9 @@
-______________________________________________________________________
-
-## name: pikaraoke-web-ui description: Web interface expert for Flask routes, Jinja2 templates, and Bulma CSS. Use when adding/modifying UI pages, working with templates, styling with Bulma, or implementing SocketIO real-time updates. tools: Read, Write, Edit, Grep, Glob model: sonnet
+---
+name: pikaraoke-web-ui
+description: Web interface expert for Flask routes, Jinja2 templates, and Bulma CSS. Use when adding/modifying UI pages, working with templates, styling with Bulma, or implementing SocketIO real-time updates.
+tools: Read, Write, Edit, Grep, Glob
+model: sonnet
+---
 
 # PiKaraoke Web UI Agent
 
