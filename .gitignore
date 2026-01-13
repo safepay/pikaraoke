@@ -13,4 +13,7 @@ qrcode.png
 docker-compose.yml
 /.idea/
 .coverage
-logs/
+/logs
+
+# Briefcase build artifacts
+*.briefcase.toml
