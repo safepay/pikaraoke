@@ -1,6 +1,6 @@
 {
   "info": {
-    "version": "1.17.1",
+    "version": "1.17.2",
     "title": "PiKaraoke API",
     "description": "API for controlling PiKaraoke - a KTV-style karaoke system",
     "termsOfService": ""
@@ -413,7 +413,7 @@
       }
     },
     "/enqueue": {
-      "get": {
+      "post": {
         "summary": "Add a song to the queue.",
         "responses": {
           "200": {
@@ -463,7 +463,7 @@
           "Queue"
         ]
       },
-      "post": {
+      "get": {
         "summary": "Add a song to the queue.",
         "responses": {
           "200": {
