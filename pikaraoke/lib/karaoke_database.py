@@ -124,6 +124,10 @@ class MetadataStatus:
 
 # At or above this, both fields matched exactly and no storefront can improve it.
 CONFIRMED_SCORE = 95
+# And at this, the name on disk is already the proposal, so there is nothing to
+# apply. Confidence and size of change are independent: a confirmed match can
+# still be a total rewrite, which is why the two are counted apart.
+ALREADY_CORRECT_SCORE = 100
 
 
 class KaraokeDatabase:
@@ -405,31 +409,32 @@ class KaraokeDatabase:
     def get_metadata_status_counts(self) -> dict[str, int]:
         """Return how many songs sit in each reportable lookup state.
 
-        MATCHED splits on the score rather than being counted whole: a suggestion
-        below CONFIRMED_SCORE exists but was not confirmed, and telling an admin
-        it "matched" overstates it. Derived here rather than stored, so moving
-        the threshold does not strand rows stamped under the old one.
+        MATCHED splits three ways on the score, because "a suggestion exists"
+        is not what an admin needs to know. Only ready_to_rename is work
+        waiting. Derived here rather than stored, so moving a threshold does not
+        strand rows stamped under the old one.
         """
         with self._lock:
             rows = self._conn.execute(
                 f"""
                 SELECT CASE
-                         WHEN metadata_status = ?
-                              AND COALESCE(suggested_score, 0) >= {CONFIRMED_SCORE}
-                           THEN 'confirmed'
-                         WHEN metadata_status = ? THEN 'review'
-                         ELSE COALESCE(metadata_status, ?)
+                         WHEN metadata_status != ? THEN COALESCE(metadata_status, ?)
+                         WHEN suggested_score >= {ALREADY_CORRECT_SCORE}
+                           THEN 'already_correct'
+                         WHEN suggested_score >= {CONFIRMED_SCORE} THEN 'ready_to_rename'
+                         ELSE 'needs_review'
                        END AS state,
                        COUNT(*)
                   FROM songs
                  GROUP BY state
                 """,
-                (MetadataStatus.MATCHED, MetadataStatus.MATCHED, MetadataStatus.PENDING),
+                (MetadataStatus.MATCHED, MetadataStatus.PENDING),
             ).fetchall()
         counts = {
             MetadataStatus.PENDING: 0,
-            "confirmed": 0,
-            "review": 0,
+            "already_correct": 0,
+            "ready_to_rename": 0,
+            "needs_review": 0,
             MetadataStatus.NO_MATCH: 0,
             MetadataStatus.MANUAL: 0,
         }

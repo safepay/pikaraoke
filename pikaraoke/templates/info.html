@@ -260,13 +260,19 @@
 					if (data.error) return;
 					$("#library-song-count").text(data.song_count);
 					var s = data.metadata_status;
-					$("#metadata-status-counts").text(
-						(data.song_count - s.pending) + " / " + data.song_count + "  ·  " +
-						{{ _('confirmed') | tojson }} + " " + s.confirmed + "  ·  " +
-						{{ _('needs review') | tojson }} + " " + s.review + "  ·  " +
-						{{ _('no match') | tojson }} + " " + s.no_match + "  ·  " +
-						{{ _('named by hand') | tojson }} + " " + s.manual
+					$("#metadata-looked-up").text(
+						(data.song_count - s.pending) + " / " + data.song_count
 					);
+					// Only ready_to_rename is work waiting; the rest are reported so
+					// the total is accountable.
+					var parts = [
+						s.ready_to_rename + " " + {{ _('ready to rename') | tojson }},
+						s.needs_review + " " + {{ _('need review') | tojson }},
+						s.already_correct + " " + {{ _('already correct') | tojson }},
+						s.no_match + " " + {{ _('no match') | tojson }}
+					];
+					if (s.manual) parts.push(s.manual + " " + {{ _('named by hand') | tojson }});
+					$("#metadata-status-counts").text(parts.join("  ·  "));
 				});
 			}
 			refreshLibraryStats();
@@ -445,10 +451,11 @@
 						{% trans %}Off by default: a first pass over a large library takes hours and uses the network throughout.{% endtrans %}
 					</p>
 					<p class="mt-3">
-						{# MSG: Label preceding the counts of songs by metadata lookup status. #}
+						{# MSG: Label preceding a count of how many songs have been looked up so far. #}
 						{% trans %}Looked up:{% endtrans %}
-						<strong id="metadata-status-counts">...</strong>
+						<strong id="metadata-looked-up">...</strong>
 					</p>
+					<p class="is-size-7" id="metadata-status-counts"></p>
 				</div>
 			</div>
 

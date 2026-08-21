@@ -493,17 +493,25 @@ class TestMetadataLookupStaging:
         db.save_suggestion("/songs/a.mp4", "Beyonce", "Halo", 2008, "Pop", 98, "US")
         assert db.get_metadata_status_counts() == {
             "pending": 2,
-            "confirmed": 1,
-            "review": 0,
+            "already_correct": 0,
+            "ready_to_rename": 1,
+            "needs_review": 0,
             "no_match": 0,
             "manual": 0,
         }
 
-    def test_a_low_scoring_match_is_reported_as_needing_review(self, db):
-        db.save_suggestion("/songs/a.mp4", "Guess", "Maybe", 1999, "Rock", 60, "US")
-        db.save_suggestion("/songs/b.mp4", "ABBA", "Waterloo", 1974, "Pop", 95, "US")
+    def test_a_confirmed_match_splits_on_whether_a_rename_is_waiting(self, db):
+        # 100 means the name on disk is already the proposal; 95 and 98 mean it
+        # is confirmed but a rename still has to be applied.
+        db.save_suggestion("/songs/a.mp4", "ABBA", "Waterloo", 1974, "Pop", 100, "US")
+        db.save_suggestion("/songs/b.mp4", "a-ha", "Take On Me", 1985, "Pop", 98, "US")
+        db.save_suggestion("/songs/c.mp4", "Guess", "Maybe", 1999, "Rock", 60, "US")
         counts = db.get_metadata_status_counts()
-        assert (counts["confirmed"], counts["review"]) == (1, 1)
+        assert (
+            counts["already_correct"],
+            counts["ready_to_rename"],
+            counts["needs_review"],
+        ) == (1, 1, 1)
 
 
 class TestStorefrontChange:
