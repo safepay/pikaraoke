@@ -269,22 +269,30 @@
 					// Best outcome first, so the list reads as a funnel down to the
 					// songs nothing could be found for. One row per line: each becomes
 					// a link into the renamer filtered to that state.
+					// Only the two actionable states carry a note; the other rows
+					// say all there is to say.
 					var rows = [
 						// {# MSG: Songs whose filename already matches what iTunes would rename them to. #}
-						[s.already_correct, {{ _('already correct') | tojson }}],
+						[s.already_correct, {{ _('already correct') | tojson }}, ""],
 						// {# MSG: Songs iTunes confirmed, where a rename is waiting to be applied. #}
-						[s.ready_to_rename, {{ _('ready to rename') | tojson }}],
-						// {# MSG: Songs where iTunes was unsure, so a person has to choose. #}
-						[s.needs_review, {{ _('need review') | tojson }}],
+						[s.ready_to_rename, {{ _('ready to rename') | tojson }},
+							// {# MSG: Note beside "ready to rename", saying why those are safe. #}
+							{{ _('artist and title confirmed') | tojson }}],
+						// {# MSG: Songs where a word differs, so a person has to decide. #}
+						[s.needs_review, {{ _('need review') | tojson }},
+							// {# MSG: Note beside "need review", saying why those were not confirmed. #}
+							{{ _('a word differs') | tojson }}],
 						// {# MSG: Songs iTunes had no result for. #}
-						[s.no_match, {{ _('no match') | tojson }}]
+						[s.no_match, {{ _('no match') | tojson }}, ""]
 					];
 					// {# MSG: Songs renamed by a person, which are never looked up again. #}
-					if (s.manual) rows.push([s.manual, {{ _('named by hand') | tojson }}]);
+					if (s.manual) rows.push([s.manual, {{ _('named by hand') | tojson }}, ""]);
 					$("#metadata-status-counts").empty().append(rows.map(function(row) {
-						return $("<li>")
+						var li = $("<li>")
 							.append($("<span class='lookup-count'>").text(row[0]))
 							.append($("<span>").text(row[1]));
+						if (row[2]) li.append($("<span class='lookup-note'>").text(row[2]));
+						return li;
 					}));
 				});
 			}

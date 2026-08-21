@@ -272,6 +272,7 @@ body.hide-cursor * {
    list, because each becomes a link into the renamer filtered to that state. */
 .lookup-status li {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
@@ -281,4 +282,9 @@ body.hide-cursor * {
   flex: 0 0 3.5em;
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* Dimmed by opacity rather than a colour, to follow whichever theme is active. */
+.lookup-status .lookup-note {
+  opacity: 0.7;
 }
