@@ -432,18 +432,25 @@ class KaraokeDatabase:
                 (file_path,),
             )
 
-    def get_metadata_status_counts(self) -> dict[str, int]:
+    def get_metadata_status_counts(self, max_attempts: int) -> dict[str, int]:
         """Return how many songs sit in each reportable lookup state.
 
         SUGGESTED splits three ways on the score, because "a suggestion exists"
-        is not what an admin needs to know. Only ready_to_rename is work
-        waiting. Derived here rather than stored, so moving a threshold does not
-        strand rows stamped under the old one.
+        is not what an admin needs to know; only ready_to_rename is work
+        waiting. A song that has used up its attempts reports as lookup_failed
+        rather than pending -- it stays stored pending so that resetting the
+        counter revives it, but counted as queued it would hold the progress
+        line short of the total and the spinner turning forever.
+
+        Both splits are derived here rather than stored, so moving a threshold
+        re-derives every row instead of stranding those stamped under the old one.
         """
         with self._lock:
             rows = self._conn.execute(
                 f"""
                 SELECT CASE
+                         WHEN metadata_status = ? AND enrichment_attempts >= ?
+                           THEN 'lookup_failed'
                          WHEN metadata_status != ? THEN COALESCE(metadata_status, ?)
                          WHEN suggested_score >= {ALREADY_CORRECT_SCORE}
                            THEN 'already_correct'
@@ -454,7 +461,12 @@ class KaraokeDatabase:
                   FROM songs
                  GROUP BY state
                 """,
-                (MetadataStatus.SUGGESTED, MetadataStatus.PENDING),
+                (
+                    MetadataStatus.PENDING,
+                    max_attempts,
+                    MetadataStatus.SUGGESTED,
+                    MetadataStatus.PENDING,
+                ),
             ).fetchall()
         counts = {
             MetadataStatus.PENDING: 0,
@@ -462,6 +474,7 @@ class KaraokeDatabase:
             "ready_to_rename": 0,
             "needs_review": 0,
             MetadataStatus.NO_MATCH: 0,
+            "lookup_failed": 0,
             MetadataStatus.ACCEPTED: 0,
             MetadataStatus.MANUAL: 0,
         }

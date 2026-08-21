@@ -479,6 +479,23 @@ class TestMetadataLookupStaging:
         assert "/songs/a.mp4" not in db.get_paths_awaiting_lookup(3)
         assert self._status(db, "/songs/a.mp4") == "pending"
 
+    def test_a_retired_song_is_counted_as_failed_not_still_queued(self, db):
+        # Stored pending so a reset revives it, but the worker will never pick
+        # it up again -- counted as pending it would hold the progress line
+        # short of the total and the spinner turning forever.
+        for _ in range(3):
+            db.record_failed_attempt("/songs/a.mp4")
+        counts = db.get_metadata_status_counts(3)
+        assert (counts["lookup_failed"], counts["pending"]) == (1, 2)
+
+    def test_raising_the_cap_puts_a_retired_song_back_in_the_queue(self, db):
+        # The cap is derived at read time, so moving it re-derives every row
+        # rather than stranding those retired under the old one.
+        for _ in range(3):
+            db.record_failed_attempt("/songs/a.mp4")
+        counts = db.get_metadata_status_counts(5)
+        assert (counts["lookup_failed"], counts["pending"]) == (0, 3)
+
     def test_save_suggestion_writes_every_field(self, db):
         db.save_suggestion("/songs/a.mp4", "Beyonce", "Halo", 2008, "Pop", 98, "GB")
         row = db.query(
@@ -491,12 +508,13 @@ class TestMetadataLookupStaging:
 
     def test_status_counts_are_zero_filled(self, db):
         db.save_suggestion("/songs/a.mp4", "Beyonce", "Halo", 2008, "Pop", 98, "US")
-        assert db.get_metadata_status_counts() == {
+        assert db.get_metadata_status_counts(3) == {
             "pending": 2,
             "already_correct": 0,
             "ready_to_rename": 1,
             "needs_review": 0,
             "no_match": 0,
+            "lookup_failed": 0,
             "accepted": 0,
             "manual": 0,
         }
@@ -510,7 +528,7 @@ class TestMetadataLookupStaging:
         db.execute(
             "UPDATE songs SET metadata_status = 'manual' WHERE file_path = ?", ("/songs/b.mp4",)
         )
-        counts = db.get_metadata_status_counts()
+        counts = db.get_metadata_status_counts(3)
         assert (counts["accepted"], counts["manual"], counts["pending"]) == (1, 1, 1)
 
     def test_a_reviewed_song_is_never_looked_up_again(self, db):
@@ -526,7 +544,7 @@ class TestMetadataLookupStaging:
         db.save_suggestion("/songs/a.mp4", "ABBA", "Waterloo", 1974, "Pop", 100, "US")
         db.save_suggestion("/songs/b.mp4", "a-ha", "Take On Me", 1985, "Pop", 98, "US")
         db.save_suggestion("/songs/c.mp4", "Guess", "Maybe", 1999, "Rock", 60, "US")
-        counts = db.get_metadata_status_counts()
+        counts = db.get_metadata_status_counts(3)
         assert (
             counts["already_correct"],
             counts["ready_to_rename"],

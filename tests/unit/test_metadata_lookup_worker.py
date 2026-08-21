@@ -66,7 +66,7 @@ class TestLookup:
         _add(db, "/songs/obscure.mp4")
         with patch("pikaraoke.lib.metadata_providers.suggest_metadata", return_value=[]):
             worker._look_up("/songs/obscure.mp4")
-        assert db.get_metadata_status_counts()["no_match"] == 1
+        assert db.get_metadata_status_counts(3)["no_match"] == 1
 
     def test_a_half_filled_result_is_not_a_match(self, worker, db):
         _add(db, "/songs/partial.mp4")
@@ -75,7 +75,7 @@ class TestLookup:
             return_value=[_suggestion(title="")],
         ):
             worker._look_up("/songs/partial.mp4")
-        assert db.get_metadata_status_counts()["no_match"] == 1
+        assert db.get_metadata_status_counts(3)["no_match"] == 1
 
     def test_a_failure_counts_the_attempt_and_stays_pending(self, worker, db):
         _add(db, "/songs/boom.mp4")
@@ -204,7 +204,7 @@ class TestNewSongs:
             "pikaraoke.lib.metadata_providers.suggest_metadata", return_value=[_suggestion()]
         ):
             worker._sweep_arrivals("0001-01-01 00:00:00")
-        assert db.get_metadata_status_counts()["pending"] == 0
+        assert db.get_metadata_status_counts(3)["pending"] == 0
 
     def test_arrivals_stop_when_the_preference_is_turned_off(
         self, worker, db, preferences, monkeypatch
@@ -216,7 +216,7 @@ class TestNewSongs:
             "pikaraoke.lib.metadata_providers.suggest_metadata", return_value=[_suggestion()]
         ):
             worker._sweep_arrivals("0001-01-01 00:00:00")
-        assert db.get_metadata_status_counts()["pending"] == 2
+        assert db.get_metadata_status_counts(3)["pending"] == 2
 
 
 class TestTheEnabledPreference:

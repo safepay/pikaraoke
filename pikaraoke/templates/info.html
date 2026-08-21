@@ -301,8 +301,8 @@
 					// Best outcome first, so the list reads as a funnel down to the
 					// songs nothing could be found for. One row per line: each becomes
 					// a link into the renamer filtered to that state.
-					// Only the two actionable states carry a note; the other rows
-					// say all there is to say.
+					// A note only where the label alone would be read wrong: the two
+					// actionable states, and the failure that is not a negative answer.
 					var rows = [
 						// {# MSG: Songs whose filename already matches what iTunes would rename them to. #}
 						[s.already_correct, {{ _('already correct') | tojson }}, ""],
@@ -317,6 +317,13 @@
 						// {# MSG: Songs iTunes had no result for. #}
 						[s.no_match, {{ _('no match') | tojson }}, ""]
 					];
+					// Songs the search itself never reached, as opposed to songs the
+					// storefront answered "nothing" for. Normally zero, so it is hidden
+					// rather than sitting at the end of the funnel reading 0 forever.
+					// {# MSG: Songs whose lookup kept failing, so the worker gave up on them. #}
+					if (s.lookup_failed) rows.push([s.lookup_failed, {{ _('could not be looked up') | tojson }},
+						// {# MSG: Note beside "could not be looked up", saying it was an error rather than a negative answer. #}
+						{{ _('the search failed') | tojson }}]);
 					// The two human states are hidden while empty: nothing writes them
 					// until the renamer records what a person decided, and a row that
 					// can only read zero teaches the reader to skip the list.

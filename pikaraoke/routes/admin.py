@@ -14,6 +14,7 @@ from marshmallow import Schema, fields
 
 from pikaraoke.karaoke import Karaoke
 from pikaraoke.lib.current_app import get_admin_password, get_karaoke_instance, is_admin
+from pikaraoke.lib.metadata_lookup_worker import MAX_ATTEMPTS
 from pikaraoke.lib.youtube_dl import get_youtubedl_version, upgrade_youtubedl
 
 _ = flask_babel.gettext
@@ -76,7 +77,7 @@ def library_stats():
     return jsonify(
         {
             "song_count": len(k.song_manager.songs),
-            "metadata_status": k.db.get_metadata_status_counts(),
+            "metadata_status": k.db.get_metadata_status_counts(MAX_ATTEMPTS),
             "seconds_per_lookup": k.metadata_lookup.seconds_per_lookup,
         }
     )
