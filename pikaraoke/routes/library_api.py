@@ -12,7 +12,12 @@ library_bp = Blueprint("library", __name__)
 def library_stats():
     """Return song count for the admin dashboard."""
     k = get_karaoke_instance()
-    return jsonify({"song_count": len(k.song_manager.songs)})
+    return jsonify(
+        {
+            "song_count": len(k.song_manager.songs),
+            "metadata_status": k.db.get_metadata_status_counts(),
+        }
+    )
 
 
 @library_bp.route("/api/sync_library", methods=["POST"])

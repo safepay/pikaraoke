@@ -185,6 +185,12 @@ def parse_pikaraoke_args() -> argparse.Namespace:
         help="Let users browse the song library by the folders it is stored in. Adds a Folders view to the Songs page when the library has subdirectories.",
         required=False,
     )
+    library.add_argument(
+        "--enable-metadata-lookup",
+        action="store_true",
+        help="Look up artist, title, year and genre for every song from iTunes in the background, so the rename page can suggest better filenames without waiting on the network. A first pass over a large library takes hours and uses the network throughout.",
+        required=False,
+    )
 
     splash = parser.add_argument_group("Splash screen")
     splash.add_argument(
