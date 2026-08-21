@@ -253,6 +253,22 @@
 				console.error("Failed to fetch system stats");
 			});
 
+			function remaining(seconds) {
+				var mins = Math.round(seconds / 60);
+				if (mins < 1) {
+					// {# MSG: Time left when a background lookup is nearly finished. #}
+					return {{ _('less than a minute left') | tojson }};
+				}
+				if (mins < 60) {
+					// {# MSG: Time left on a background lookup, under an hour. {n} is a number of minutes. #}
+					return {{ _('about {n} minutes left') | tojson }}.replace("{n}", mins);
+				}
+				// {# MSG: Time left on a background lookup, an hour or more. {h} is hours, {m} is minutes. #}
+				return {{ _('about {h}h {m}m left') | tojson }}
+					.replace("{h}", Math.floor(mins / 60))
+					.replace("{m}", mins % 60);
+			}
+
 			// Song library stats. Polled rather than fetched once: a lookup sweep
 			// runs for hours, so a static count would be stale the whole time.
 			function refreshLibraryStats() {
@@ -261,11 +277,15 @@
 					$("#library-song-count").text(data.song_count);
 					var s = data.metadata_status;
 					// {# MSG: How many songs have been looked up so far, e.g. "90 of 597 looked up". {done} and {total} are replaced with numbers. #}
-					$("#metadata-looked-up").text(
-						{{ _('{done} of {total} looked up') | tojson }}
-							.replace("{done}", data.song_count - s.pending)
-							.replace("{total}", data.song_count)
-					);
+					var progress = {{ _('{done} of {total} looked up') | tojson }}
+						.replace("{done}", data.song_count - s.pending)
+						.replace("{total}", data.song_count);
+					// The rate is what the worker has actually been managing, not a
+					// constant: a Pi over wifi is not a desktop on ethernet.
+					if (s.pending) {
+						progress += "  ·  " + remaining(s.pending * data.seconds_per_lookup);
+					}
+					$("#metadata-looked-up").text(progress);
 					// Best outcome first, so the list reads as a funnel down to the
 					// songs nothing could be found for. One row per line: each becomes
 					// a link into the renamer filtered to that state.

@@ -1,6 +1,7 @@
 """Background lookup of song metadata, so the renamer never calls the network."""
 
 import logging
+import time
 from datetime import datetime, timezone
 
 from gevent import Greenlet, sleep, spawn
@@ -11,9 +12,18 @@ from pikaraoke.lib.metadata_parser import has_artist_title_separator, regex_tidy
 from pikaraoke.lib.preference_manager import PreferenceManager
 from pikaraoke.lib.song_manager import SongManager
 
-# Longer than ITUNES_RATE_LIMIT so the edit page's Suggest button, which shares
-# the provider's class-level gate, usually wins it.
-LOOKUP_INTERVAL = 5.0
+# Still comfortably longer than ITUNES_RATE_LIMIT, so the edit page's Suggest
+# button, which shares the provider's class-level gate, usually wins it -- and a
+# click never waits longer than that 2s gate whatever this is set to.
+LOOKUP_INTERVAL = 3.0
+# The sleep is not the whole cost: the search itself took 1-2s over a Windows
+# desktop's connection, so the sleep sits below the round figure to land the
+# cadence on it. Only a seed -- the real figure depends on the hardware and the
+# link, so the worker measures it and the estimate follows what it observes.
+_INITIAL_SECONDS_PER_LOOKUP = LOOKUP_INTERVAL + 1.5
+# Weight of the newest sample. Low enough that one slow response does not swing
+# a remaining-time estimate the reader is watching.
+_PACE_SMOOTHING = 0.2
 IDLE_INTERVAL = 30.0
 MAX_ATTEMPTS = 3
 # Yield while classifying, which is pure CPU over the whole library.
@@ -30,6 +40,7 @@ class MetadataLookupWorker:
         self._preferences = preferences
         self._events = events
         self._worker: Greenlet | None = None
+        self._seconds_per_lookup = _INITIAL_SECONDS_PER_LOOKUP
 
     def start(self) -> None:
         """Start the lookup greenlet.
@@ -43,6 +54,11 @@ class MetadataLookupWorker:
         if self._worker is not None:
             self._worker.kill(block=False)
             self._worker = None
+
+    @property
+    def seconds_per_lookup(self) -> float:
+        """Observed time for one lookup, for the settings page's estimate."""
+        return self._seconds_per_lookup
 
     @property
     def enabled(self) -> bool:
@@ -79,12 +95,15 @@ class MetadataLookupWorker:
             self._process(path)
 
     def _process(self, path: str) -> None:
+        started = time.monotonic()
         self._look_up(path)
         # Per song, so the settings page counts up while it is watched. The
         # event carries no payload; only an open settings page acts on it, by
         # refetching one grouped count.
         self._events.emit("metadata_lookup_progress")
         sleep(LOOKUP_INTERVAL)
+        elapsed = time.monotonic() - started
+        self._seconds_per_lookup += _PACE_SMOOTHING * (elapsed - self._seconds_per_lookup)
 
     def _prioritised_paths(self) -> list[str]:
         """Pending paths, unusable names first.

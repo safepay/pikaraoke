@@ -197,6 +197,8 @@ class MockKeepAwake:
 class MockMetadataLookupWorker:
     """Minimal mock of MetadataLookupWorker that records whether it is running."""
 
+    seconds_per_lookup = 5.5
+
     def __init__(self):
         self.running = False
 

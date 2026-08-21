@@ -77,6 +77,7 @@ def library_stats():
         {
             "song_count": len(k.song_manager.songs),
             "metadata_status": k.db.get_metadata_status_counts(),
+            "seconds_per_lookup": k.metadata_lookup.seconds_per_lookup,
         }
     )
 
