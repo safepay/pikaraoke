@@ -319,20 +319,27 @@ class KaraokeDatabase:
     # Online metadata lookup (the background worker's staging area)
     # ------------------------------------------------------------------
 
-    def get_paths_awaiting_lookup(self, max_attempts: int) -> list[str]:
+    def get_paths_awaiting_lookup(
+        self, max_attempts: int, added_since: str | None = None
+    ) -> list[str]:
         """Return file paths the lookup worker should still try, unordered.
 
         Priority is the caller's: the database does not know how a name tidies.
+
+        added_since limits the result to songs the library gained after that UTC
+        timestamp, which is how a song added mid-sweep is told apart from the
+        backlog the sweep started with.
         """
+        sql = """
+            SELECT file_path FROM songs
+            WHERE metadata_status = ? AND enrichment_attempts < ?
+        """
+        params: tuple = (MetadataStatus.PENDING, max_attempts)
+        if added_since is not None:
+            sql += " AND created_at > ?"
+            params += (added_since,)
         with self._lock:
-            rows = self._conn.execute(
-                """
-                SELECT file_path FROM songs
-                WHERE metadata_status = ? AND enrichment_attempts < ?
-                """,
-                (MetadataStatus.PENDING, max_attempts),
-            ).fetchall()
-            return [row[0] for row in rows]
+            return [row[0] for row in self._conn.execute(sql, params).fetchall()]
 
     def save_suggestion(
         self,

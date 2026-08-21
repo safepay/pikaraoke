@@ -177,6 +177,47 @@ class TestPriority:
         assert worker._prioritised_paths() == ["/songs/b.mp4"]
 
 
+class TestNewSongs:
+    """A song added to the library is looked up with no admin action. During a
+    sweep that means jumping the backlog, which it would otherwise sit at the
+    back of -- a YouTube name that tidies cleanly sorts to the cosmetic tier."""
+
+    def test_a_newly_added_song_is_picked_up(self, worker, db):
+        _add(db, "/songs/just_downloaded.mp4")
+        assert worker._prioritised_paths() == ["/songs/just_downloaded.mp4"]
+
+    def test_a_song_added_before_the_sweep_is_not_an_arrival(self, db):
+        _add(db, "/songs/old.mp4")
+        later = "9999-01-01 00:00:00"
+        assert db.get_paths_awaiting_lookup(3, added_since=later) == []
+
+    def test_a_song_added_after_the_sweep_started_is_an_arrival(self, db):
+        _add(db, "/songs/new.mp4")
+        earlier = "0001-01-01 00:00:00"
+        assert db.get_paths_awaiting_lookup(3, added_since=earlier) == ["/songs/new.mp4"]
+
+    def test_an_arrival_is_looked_up_without_waiting_for_the_backlog(self, worker, db, monkeypatch):
+        monkeypatch.setattr("pikaraoke.lib.metadata_lookup_worker.LOOKUP_INTERVAL", 0)
+        _add(db, "/songs/backlog.mp4", "/songs/arrived.mp4")
+        with patch(
+            "pikaraoke.lib.metadata_providers.suggest_metadata", return_value=[_suggestion()]
+        ):
+            worker._sweep_arrivals("0001-01-01 00:00:00")
+        assert db.get_metadata_status_counts()["pending"] == 0
+
+    def test_arrivals_stop_when_the_preference_is_turned_off(
+        self, worker, db, preferences, monkeypatch
+    ):
+        monkeypatch.setattr("pikaraoke.lib.metadata_lookup_worker.LOOKUP_INTERVAL", 0)
+        _add(db, "/songs/a.mp4", "/songs/b.mp4")
+        preferences.set("enable_metadata_lookup", False)
+        with patch(
+            "pikaraoke.lib.metadata_providers.suggest_metadata", return_value=[_suggestion()]
+        ):
+            worker._sweep_arrivals("0001-01-01 00:00:00")
+        assert db.get_metadata_status_counts()["pending"] == 2
+
+
 class TestTheEnabledPreference:
     def test_off_by_default(self, db, preferences):
         w = MetadataLookupWorker(db=db, preferences=preferences, events=EventSystem())
