@@ -109,6 +109,23 @@ CREATE INDEX IF NOT EXISTS idx_plays_song ON plays(song_id);
 """
 
 
+class MetadataStatus:
+    """Lifecycle of a song's online metadata lookup (songs.metadata_status).
+
+    MANUAL is terminal; every other state is re-queued by a storefront change,
+    which is why NO_MATCH is a distinct value rather than an attempt count.
+    """
+
+    PENDING = "pending"
+    MATCHED = "matched"
+    NO_MATCH = "no_match"
+    MANUAL = "manual"
+
+
+# At or above this, both fields matched exactly and no storefront can improve it.
+CONFIRMED_SCORE = 95
+
+
 class KaraokeDatabase:
     """Persistent song library backed by SQLite.
 
@@ -293,6 +310,161 @@ class KaraokeDatabase:
     def update_path(self, old_path: str, new_path: str) -> None:
         """Update a single song's file path (UI-triggered rename)."""
         self.update_paths([(old_path, new_path)])
+
+    # ------------------------------------------------------------------
+    # Online metadata lookup (the background worker's staging area)
+    # ------------------------------------------------------------------
+
+    def get_paths_awaiting_lookup(self, max_attempts: int) -> list[str]:
+        """Return file paths the lookup worker should still try, unordered.
+
+        Priority is the caller's: the database does not know how a name tidies.
+        """
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT file_path FROM songs
+                WHERE metadata_status = ? AND enrichment_attempts < ?
+                """,
+                (MetadataStatus.PENDING, max_attempts),
+            ).fetchall()
+            return [row[0] for row in rows]
+
+    def save_suggestion(
+        self,
+        file_path: str,
+        artist: str,
+        title: str,
+        year: int | None,
+        genre: str | None,
+        score: int,
+        country: str,
+    ) -> None:
+        """Store a lookup result against a song and mark it matched.
+
+        MATCHED says a suggestion exists, nothing more. Whether it differs from
+        the name on disk is derived when the renamer draws the row, since the
+        file can be renamed after the lookup.
+        """
+        with self._lock, self._conn:
+            self._conn.execute(
+                """
+                UPDATE songs
+                   SET artist = ?, title = ?,
+                       suggested_year = ?, suggested_genre = ?, suggested_score = ?,
+                       metadata_country = ?, metadata_status = ?,
+                       enrichment_attempts = enrichment_attempts + 1,
+                       last_enrichment_attempt = CURRENT_TIMESTAMP,
+                       updated_at = CURRENT_TIMESTAMP
+                 WHERE file_path = ?
+                """,
+                (
+                    artist,
+                    title,
+                    year,
+                    genre,
+                    score,
+                    country,
+                    MetadataStatus.MATCHED,
+                    file_path,
+                ),
+            )
+
+    def mark_no_match(self, file_path: str, country: str) -> None:
+        """Record that the storefront had nothing for this song."""
+        with self._lock, self._conn:
+            self._conn.execute(
+                """
+                UPDATE songs
+                   SET metadata_status = ?, metadata_country = ?,
+                       enrichment_attempts = enrichment_attempts + 1,
+                       last_enrichment_attempt = CURRENT_TIMESTAMP,
+                       updated_at = CURRENT_TIMESTAMP
+                 WHERE file_path = ?
+                """,
+                (MetadataStatus.NO_MATCH, country, file_path),
+            )
+
+    def record_failed_attempt(self, file_path: str) -> None:
+        """Count an attempt that neither matched nor ruled the song out.
+
+        Leaves the song pending so a transient failure is retried, but bounded:
+        without this a permanently failing song is picked up on every sweep.
+        """
+        with self._lock, self._conn:
+            self._conn.execute(
+                """
+                UPDATE songs
+                   SET enrichment_attempts = enrichment_attempts + 1,
+                       last_enrichment_attempt = CURRENT_TIMESTAMP
+                 WHERE file_path = ?
+                """,
+                (file_path,),
+            )
+
+    def get_metadata_status_counts(self) -> dict[str, int]:
+        """Return how many songs sit in each reportable lookup state.
+
+        MATCHED splits on the score rather than being counted whole: a suggestion
+        below CONFIRMED_SCORE exists but was not confirmed, and telling an admin
+        it "matched" overstates it. Derived here rather than stored, so moving
+        the threshold does not strand rows stamped under the old one.
+        """
+        with self._lock:
+            rows = self._conn.execute(
+                f"""
+                SELECT CASE
+                         WHEN metadata_status = ?
+                              AND COALESCE(suggested_score, 0) >= {CONFIRMED_SCORE}
+                           THEN 'confirmed'
+                         WHEN metadata_status = ? THEN 'review'
+                         ELSE COALESCE(metadata_status, ?)
+                       END AS state,
+                       COUNT(*)
+                  FROM songs
+                 GROUP BY state
+                """,
+                (MetadataStatus.MATCHED, MetadataStatus.MATCHED, MetadataStatus.PENDING),
+            ).fetchall()
+        counts = {
+            MetadataStatus.PENDING: 0,
+            "confirmed": 0,
+            "review": 0,
+            MetadataStatus.NO_MATCH: 0,
+            MetadataStatus.MANUAL: 0,
+        }
+        for state, count in rows:
+            counts[state] = count
+        return counts
+
+    def clear_unconfirmed_suggestions(self, country: str) -> int:
+        """Re-queue songs a different storefront might do better on, returning the count.
+
+        Confirmed matches are left alone, so a well-matched library re-sweeps
+        almost nothing. year and genre must never join the SET list: they are
+        human-confirmed and have no source outside this table.
+        """
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                f"""
+                UPDATE songs
+                   SET metadata_status = ?, enrichment_attempts = 0,
+                       artist = NULL, title = NULL,
+                       suggested_year = NULL, suggested_genre = NULL,
+                       suggested_score = NULL,
+                       updated_at = CURRENT_TIMESTAMP
+                 WHERE metadata_status IN (?, ?)
+                   AND (suggested_score IS NULL OR suggested_score < {CONFIRMED_SCORE})
+                   AND (metadata_country IS NULL OR metadata_country != ?)
+                """,
+                (
+                    MetadataStatus.PENDING,
+                    MetadataStatus.MATCHED,
+                    MetadataStatus.NO_MATCH,
+                    country,
+                ),
+            )
+            return cursor.rowcount
 
     # ------------------------------------------------------------------
     # Metadata (app-level key-value store)

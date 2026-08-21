@@ -29,6 +29,7 @@ from pikaraoke.lib.get_platform import (
 from pikaraoke.lib.karaoke_database import KaraokeDatabase
 from pikaraoke.lib.keep_awake import KeepAwake
 from pikaraoke.lib.library_scanner import LibraryScanner, ScanResult
+from pikaraoke.lib.metadata_lookup_worker import MetadataLookupWorker
 from pikaraoke.lib.network import get_ip
 from pikaraoke.lib.play_history_manager import PlayHistoryManager
 from pikaraoke.lib.playback_controller import PlaybackController
@@ -136,6 +137,7 @@ class Karaoke:
         volume: float | None = None,
         enable_title_tidy: bool | None = None,
         enable_folder_browsing: bool | None = None,
+        enable_metadata_lookup: bool | None = None,
     ) -> None:
         """Initialize the Karaoke instance.
 
@@ -177,6 +179,7 @@ class Karaoke:
             socketio: SocketIO instance for real-time event emission.
             preferred_language: Language code for UI (e.g., 'en', 'de_DE').
             enable_folder_browsing: Offer a Folders view on the Songs page.
+            enable_metadata_lookup: Run the background iTunes lookup worker.
         """
         logging.basicConfig(
             format="[%(asctime)s] %(levelname)s: %(message)s",
@@ -277,6 +280,7 @@ class Karaoke:
         self.events.on("song_downloaded", self.register_downloaded_song)
         self._relay_to_browser("sync_started")
         self._relay_to_browser("sync_finished")
+        self._relay_to_browser("metadata_lookup_progress")
 
         # Initialize microphone manager for server-side mic passthrough
         self.sound_manager = SoundManager(
@@ -322,6 +326,14 @@ class Karaoke:
             logging.info("No existing database found, scanning song directory")
             result = self._scanner.scan(self.download_path)
             self._apply_scan_result(result)
+
+        # After the library exists, so the cold-start scan is not competing for
+        # the database lock. The greenlet runs either way and reads the
+        # preference each cycle, so toggling it needs no lifecycle wiring.
+        self.metadata_lookup = MetadataLookupWorker(
+            db=self.db, preferences=self.preferences, events=self.events
+        )
+        self.metadata_lookup.start()
 
     def _apply_scan_result(self, result: ScanResult) -> None:
         """Update SongList and emit notifications after a scan."""
@@ -604,6 +616,7 @@ class Karaoke:
 
     def stop(self) -> None:
         """Stop the karaoke run loop."""
+        self.metadata_lookup.stop()
         self.sound_manager.stop()
         self._keep_awake.stop()
         self.running = False

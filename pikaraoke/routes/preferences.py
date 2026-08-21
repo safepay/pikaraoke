@@ -36,6 +36,8 @@ def change_preferences(query):
             broadcast_event("preferences_update", {"key": preference, "value": val})
             if preference in _SCORE_PHRASE_KEYS:
                 broadcast_event("score_phrases_update", _get_active_score_phrases(k))
+            if preference == "itunes_search_country":
+                k.db.clear_unconfirmed_suggestions(val)
         return jsonify([success, message])
     else:
         # MSG: Message shown after trying to change preferences without admin permissions.

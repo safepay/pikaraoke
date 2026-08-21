@@ -287,6 +287,7 @@ def main() -> None:
         config_file_path=args.config_file_path,
         cdg_pixel_scaling=args.cdg_pixel_scaling,
         enable_folder_browsing=args.enable_folder_browsing,
+        enable_metadata_lookup=args.enable_metadata_lookup,
         streaming_format=args.streaming_format,
         additional_ytdl_args=getattr(args, "ytdl_args", None),
         socketio=socketio,

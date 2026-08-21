@@ -80,7 +80,7 @@ _fix_ssl_recursion()
 
 
 class MetadataProvider(Protocol):
-    def search(self, query: str, limit: int = 5) -> list[dict]:
+    def search(self, query: str, limit: int = 5, max_retries: int = 0) -> list[dict]:
         """Search for tracks. Returns [{artist, title, year, genre, source}]."""
         ...
 
@@ -651,6 +651,7 @@ def suggest_metadata(
     provider: MetadataProvider | None = None,
     limit: int = 5,
     artist_first: bool = True,
+    max_retries: int = 0,
 ) -> list[dict]:
     """Tidy a display name and search for metadata suggestions.
 
@@ -660,6 +661,10 @@ def suggest_metadata(
             filename's, so suggestions pull an untidy library into line. It also
             decides which order scores 100, so the default mirrors the
             "artist_title" default of the suggestion_name_order preference.
+        max_retries: Passed to the provider. Defaults to 0 for the edit page,
+            where a person is waiting; the background worker is not, and asks
+            for ITUNES_MAX_RETRIES so a transient failure does not cost the song
+            an attempt.
     """
     if provider is None:
         provider = ITunesProvider()
@@ -669,7 +674,9 @@ def suggest_metadata(
     feat_match = _FEATURING_PATTERN.search(tidied)
     featuring = feat_match.group("name").strip() if feat_match else ""
     search_query = _FEATURING_PATTERN.sub("", tidied).strip()
-    results = provider.search(search_query, limit=limit * _OVERFETCH_FACTOR)
+    results = provider.search(
+        search_query, limit=limit * _OVERFETCH_FACTOR, max_retries=max_retries
+    )
     # The untidied name, not the query: the question the anchors answer is what
     # is on disk, not what the tidy makes of it.
     scored = _deduplicate_suggestions(results, search_query, display_name, artist_first, featuring)

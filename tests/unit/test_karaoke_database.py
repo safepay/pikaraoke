@@ -434,3 +434,146 @@ class TestGetPathsByYoutubeIds:
     def test_ignores_songs_without_a_youtube_id(self, db):
         db.insert_songs([{"file_path": "/songs/Local.zip", "youtube_id": None, "format": "zip"}])
         assert db.get_paths_by_youtube_ids(["aaaaaaaaaaa"]) == {}
+
+
+class TestMetadataLookupStaging:
+    """The worker's staging area: what it picks up, what it writes, and what a
+    storefront change is allowed to throw away."""
+
+    @pytest.fixture
+    def db(self, tmp_path):
+        d = KaraokeDatabase(str(tmp_path / "test.db"))
+        d.insert_songs(
+            [
+                {"file_path": f"/songs/{n}.mp4", "youtube_id": None, "format": "mp4"}
+                for n in ("a", "b", "c")
+            ]
+        )
+        yield d
+        d.close()
+
+    def _status(self, db, path):
+        return db.query("SELECT metadata_status FROM songs WHERE file_path = ?", (path,))[0][0]
+
+    def test_pending_songs_are_offered(self, db):
+        assert set(db.get_paths_awaiting_lookup(3)) == {
+            "/songs/a.mp4",
+            "/songs/b.mp4",
+            "/songs/c.mp4",
+        }
+
+    def test_matched_and_no_match_are_not_offered(self, db):
+        db.save_suggestion("/songs/a.mp4", "Beyonce", "Halo", 2008, "Pop", 98, "US")
+        db.mark_no_match("/songs/b.mp4", "US")
+        assert db.get_paths_awaiting_lookup(3) == ["/songs/c.mp4"]
+
+    def test_manual_songs_are_never_offered(self, db):
+        db.execute(
+            "UPDATE songs SET metadata_status = 'manual' WHERE file_path = ?", ("/songs/a.mp4",)
+        )
+        assert "/songs/a.mp4" not in db.get_paths_awaiting_lookup(3)
+
+    def test_the_attempt_cap_retires_a_song(self, db):
+        for _ in range(3):
+            db.record_failed_attempt("/songs/a.mp4")
+        assert "/songs/a.mp4" not in db.get_paths_awaiting_lookup(3)
+        assert self._status(db, "/songs/a.mp4") == "pending"
+
+    def test_save_suggestion_writes_every_field(self, db):
+        db.save_suggestion("/songs/a.mp4", "Beyonce", "Halo", 2008, "Pop", 98, "GB")
+        row = db.query(
+            "SELECT artist, title, suggested_year, suggested_genre, suggested_score, "
+            "metadata_country, metadata_status, enrichment_attempts FROM songs "
+            "WHERE file_path = ?",
+            ("/songs/a.mp4",),
+        )[0]
+        assert tuple(row) == ("Beyonce", "Halo", 2008, "Pop", 98, "GB", "matched", 1)
+
+    def test_status_counts_are_zero_filled(self, db):
+        db.save_suggestion("/songs/a.mp4", "Beyonce", "Halo", 2008, "Pop", 98, "US")
+        assert db.get_metadata_status_counts() == {
+            "pending": 2,
+            "confirmed": 1,
+            "review": 0,
+            "no_match": 0,
+            "manual": 0,
+        }
+
+    def test_a_low_scoring_match_is_reported_as_needing_review(self, db):
+        db.save_suggestion("/songs/a.mp4", "Guess", "Maybe", 1999, "Rock", 60, "US")
+        db.save_suggestion("/songs/b.mp4", "ABBA", "Waterloo", 1974, "Pop", 95, "US")
+        counts = db.get_metadata_status_counts()
+        assert (counts["confirmed"], counts["review"]) == (1, 1)
+
+
+class TestStorefrontChange:
+    """clear_unconfirmed_suggestions is deliberately narrower than a full reset."""
+
+    @pytest.fixture
+    def db(self, tmp_path):
+        d = KaraokeDatabase(str(tmp_path / "test.db"))
+        d.insert_songs(
+            [
+                {"file_path": f"/songs/{n}.mp4", "youtube_id": None, "format": "mp4"}
+                for n in ("confirmed", "fuzzy", "nothing", "manual", "already_jp")
+            ]
+        )
+        d.save_suggestion("/songs/confirmed.mp4", "ABBA", "Waterloo", 1974, "Pop", 100, "US")
+        d.save_suggestion("/songs/fuzzy.mp4", "Guess", "Maybe", 1999, "Rock", 60, "US")
+        d.mark_no_match("/songs/nothing.mp4", "US")
+        d.save_suggestion("/songs/manual.mp4", "Someone", "Something", 1980, "Pop", 40, "US")
+        d.execute(
+            "UPDATE songs SET metadata_status = 'manual' WHERE file_path = ?",
+            ("/songs/manual.mp4",),
+        )
+        d.save_suggestion("/songs/already_jp.mp4", "Yoasobi", "Idol", 2023, "J-Pop", 70, "JP")
+        yield d
+        d.close()
+
+    def _requeued(self, db):
+        return set(db.get_paths_awaiting_lookup(3))
+
+    def test_confirmed_matches_are_left_alone(self, db):
+        db.clear_unconfirmed_suggestions("JP")
+        assert "/songs/confirmed.mp4" not in self._requeued(db)
+        row = db.query(
+            "SELECT artist, suggested_score FROM songs WHERE file_path = ?",
+            ("/songs/confirmed.mp4",),
+        )[0]
+        assert tuple(row) == ("ABBA", 100)
+
+    def test_unconfirmed_and_no_match_are_requeued(self, db):
+        db.clear_unconfirmed_suggestions("JP")
+        assert {"/songs/fuzzy.mp4", "/songs/nothing.mp4"} <= self._requeued(db)
+
+    def test_a_requeued_song_loses_its_stale_suggestion(self, db):
+        db.clear_unconfirmed_suggestions("JP")
+        row = db.query(
+            "SELECT artist, title, suggested_year, suggested_genre, suggested_score "
+            "FROM songs WHERE file_path = ?",
+            ("/songs/fuzzy.mp4",),
+        )[0]
+        assert tuple(row) == (None, None, None, None, None)
+
+    def test_manual_songs_survive_untouched(self, db):
+        db.clear_unconfirmed_suggestions("JP")
+        row = db.query(
+            "SELECT metadata_status, artist, suggested_score FROM songs WHERE file_path = ?",
+            ("/songs/manual.mp4",),
+        )[0]
+        assert tuple(row) == ("manual", "Someone", 40)
+
+    def test_songs_already_tried_against_that_store_are_skipped(self, db):
+        db.clear_unconfirmed_suggestions("JP")
+        assert "/songs/already_jp.mp4" not in self._requeued(db)
+
+    def test_durable_year_and_genre_are_never_cleared(self, db):
+        db.execute(
+            "UPDATE songs SET year = 1999, genre = 'Rock' WHERE file_path = ?",
+            ("/songs/fuzzy.mp4",),
+        )
+        db.clear_unconfirmed_suggestions("JP")
+        row = db.query("SELECT year, genre FROM songs WHERE file_path = ?", ("/songs/fuzzy.mp4",))[
+            0
+        ]
+        assert tuple(row) == (1999, "Rock")

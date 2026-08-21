@@ -350,6 +350,12 @@ def parse_pikaraoke_args() -> argparse.Namespace:
         required=False,
     )
     parser.add_argument(
+        "--enable-metadata-lookup",
+        action="store_true",
+        help="Look up artist, title, year and genre for every song from iTunes in the background, so the rename page can suggest better filenames without waiting on the network. A first pass over a large library takes hours and uses the network throughout.",
+        required=False,
+    )
+    parser.add_argument(
         "--enable-mic-passthrough",
         action="store_true",
         help="Enable experimental server-side microphone passthrough so singers can hear themselves through the karaoke speakers.",

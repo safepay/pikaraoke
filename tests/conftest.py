@@ -194,6 +194,19 @@ class MockKeepAwake:
         self.active = False
 
 
+class MockMetadataLookupWorker:
+    """Minimal mock of MetadataLookupWorker that records whether it is running."""
+
+    def __init__(self):
+        self.running = False
+
+    def start(self):
+        self.running = True
+
+    def stop(self):
+        self.running = False
+
+
 class MockKaraoke:
     """Minimal mock of the Karaoke class for testing queue operations.
 
@@ -205,6 +218,7 @@ class MockKaraoke:
         self.song_manager = MockSongManager()
         self.sound_manager = MockSoundManager()
         self._keep_awake = MockKeepAwake()
+        self.metadata_lookup = MockMetadataLookupWorker()
         self._socketio = None
         self.events = EventSystem()
         self.preferences = PreferenceManager(

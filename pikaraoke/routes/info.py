@@ -82,6 +82,7 @@ def info():
         itunes_countries=ITUNES_COUNTRIES,
         itunes_search_country=itunes_search_country,
         suggestion_name_order=suggestion_name_order,
+        enable_metadata_lookup=k.enable_metadata_lookup,
         browse_results_per_page=k.browse_results_per_page,
         per_page_options=per_page_options(k.browse_results_per_page),
         enable_title_tidy=k.enable_title_tidy,
