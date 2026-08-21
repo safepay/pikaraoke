@@ -260,19 +260,32 @@
 					if (data.error) return;
 					$("#library-song-count").text(data.song_count);
 					var s = data.metadata_status;
+					// {# MSG: How many songs have been looked up so far, e.g. "90 of 597 looked up". {done} and {total} are replaced with numbers. #}
 					$("#metadata-looked-up").text(
-						(data.song_count - s.pending) + " / " + data.song_count
+						{{ _('{done} of {total} looked up') | tojson }}
+							.replace("{done}", data.song_count - s.pending)
+							.replace("{total}", data.song_count)
 					);
-					// Only ready_to_rename is work waiting; the rest are reported so
-					// the total is accountable.
-					var parts = [
-						s.ready_to_rename + " " + {{ _('ready to rename') | tojson }},
-						s.needs_review + " " + {{ _('need review') | tojson }},
-						s.already_correct + " " + {{ _('already correct') | tojson }},
-						s.no_match + " " + {{ _('no match') | tojson }}
+					// Best outcome first, so the list reads as a funnel down to the
+					// songs nothing could be found for. One row per line: each becomes
+					// a link into the renamer filtered to that state.
+					var rows = [
+						// {# MSG: Songs whose filename already matches what iTunes would rename them to. #}
+						[s.already_correct, {{ _('already correct') | tojson }}],
+						// {# MSG: Songs iTunes confirmed, where a rename is waiting to be applied. #}
+						[s.ready_to_rename, {{ _('ready to rename') | tojson }}],
+						// {# MSG: Songs where iTunes was unsure, so a person has to choose. #}
+						[s.needs_review, {{ _('need review') | tojson }}],
+						// {# MSG: Songs iTunes had no result for. #}
+						[s.no_match, {{ _('no match') | tojson }}]
 					];
-					if (s.manual) parts.push(s.manual + " " + {{ _('named by hand') | tojson }});
-					$("#metadata-status-counts").text(parts.join("  ·  "));
+					// {# MSG: Songs renamed by a person, which are never looked up again. #}
+					if (s.manual) rows.push([s.manual, {{ _('named by hand') | tojson }}]);
+					$("#metadata-status-counts").empty().append(rows.map(function(row) {
+						return $("<li>")
+							.append($("<span class='lookup-count'>").text(row[0]))
+							.append($("<span>").text(row[1]));
+					}));
 				});
 			}
 			refreshLibraryStats();
@@ -436,26 +449,22 @@
 					</div>
 					<p class="is-size-7 has-text-warning">
 						{# MSG: Help text under the iTunes search country dropdown. #}
-						{% trans %}Changing the store looks up any song it could not confirm before. Songs it already matched exactly are left alone.{% endtrans %}
+						{% trans %}Only songs it could not confirm are looked up again.{% endtrans %}
 					</p>
 
 					<hr class="my-4">
 
 					<div class="user-preference-container">
 					<input id="pref-enable-metadata-lookup" type="checkbox" class="user-preference-checkbox checkbox" data-pref="enable_metadata_lookup" {% if enable_metadata_lookup == True %}checked{% endif %}>
-					<label class="label" for="pref-enable-metadata-lookup">{# MSG: Checkbox label which enables background lookup of song details from iTunes #} {% trans %}Look up song details online (fetches artist, title, year and genre in the background){% endtrans %}
+					<label class="label" for="pref-enable-metadata-lookup">{# MSG: Checkbox label which enables background lookup of song details from iTunes #} {% trans %}Look up song details online{% endtrans %}
 					</label>
 					</div>
 					<p class="is-size-7 has-text-warning">
-						{# MSG: Help text explaining the cost of the background metadata lookup. #}
-						{% trans %}Off by default: a first pass over a large library takes hours and uses the network throughout.{% endtrans %}
+						{# MSG: Help text explaining what the background lookup does and what it costs. #}
+						{% trans %}Finds the artist, title, year and genre for each song. The first pass over a large library takes hours.{% endtrans %}
 					</p>
-					<p class="mt-3">
-						{# MSG: Label preceding a count of how many songs have been looked up so far. #}
-						{% trans %}Looked up:{% endtrans %}
-						<strong id="metadata-looked-up">...</strong>
-					</p>
-					<p class="is-size-7" id="metadata-status-counts"></p>
+					<p class="mt-4 mb-0" id="metadata-looked-up"></p>
+					<ul class="is-size-7 lookup-status" id="metadata-status-counts"></ul>
 				</div>
 			</div>
 

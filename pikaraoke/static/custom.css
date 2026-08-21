@@ -267,3 +267,18 @@ body.hide-cursor * {
   align-items: center;
   margin-top: 10px;
 }
+
+/* Lookup status rows on the settings page. One per line rather than a run-on
+   list, because each becomes a link into the renamer filtered to that state. */
+.lookup-status li {
+  display: flex;
+  gap: 10px;
+}
+
+/* Fixed column, right-aligned and tabular, so the digits stay put as the
+   worker counts up rather than shuffling the labels sideways. */
+.lookup-status .lookup-count {
+  flex: 0 0 3.5em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

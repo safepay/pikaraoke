@@ -15,9 +15,6 @@ from pikaraoke.lib.song_manager import SongManager
 LOOKUP_INTERVAL = 5.0
 IDLE_INTERVAL = 30.0
 MAX_ATTEMPTS = 3
-# Songs between progress events. The browser only refetches a count, but the
-# emit reaches every connected phone, so it is not worth doing per song.
-PROGRESS_EVERY = 10
 # Yield while classifying, which is pure CPU over the whole library.
 _CLASSIFY_CHUNK = 200
 
@@ -59,14 +56,15 @@ class MetadataLookupWorker:
             if not batch:
                 sleep(IDLE_INTERVAL)
                 continue
-            for done, path in enumerate(batch, start=1):
+            for path in batch:
                 if not self.enabled:
                     break
                 self._look_up(path)
-                if done % PROGRESS_EVERY == 0:
-                    self._events.emit("metadata_lookup_progress")
+                # Per song, so the settings page counts up while it is watched.
+                # The event carries no payload; only an open settings page acts
+                # on it, by refetching one grouped count.
+                self._events.emit("metadata_lookup_progress")
                 sleep(LOOKUP_INTERVAL)
-            self._events.emit("metadata_lookup_progress")
 
     def _prioritised_paths(self) -> list[str]:
         """Pending paths, unusable names first.
