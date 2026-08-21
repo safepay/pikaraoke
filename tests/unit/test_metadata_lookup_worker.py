@@ -2,6 +2,7 @@
 
 import subprocess
 import sys
+import time
 from unittest.mock import patch
 
 import pytest
@@ -247,3 +248,36 @@ class TestImportSideEffects:
             check=True,
         )
         assert result.stdout.strip() == "False"
+
+
+class TestPace:
+    """The settings page multiplies this by the pending count for its estimate,
+    so it has to follow the hardware rather than a constant: a Pi over wifi is
+    not a Windows desktop on ethernet."""
+
+    def test_starts_from_the_seeded_estimate(self, worker):
+        assert worker.seconds_per_lookup == pytest.approx(4.5)
+
+    def test_follows_what_the_worker_actually_manages(self, worker, db, monkeypatch):
+        monkeypatch.setattr("pikaraoke.lib.metadata_lookup_worker.LOOKUP_INTERVAL", 0)
+        _add(db, *[f"/songs/{n}.mp4" for n in range(30)])
+        with patch(
+            "pikaraoke.lib.metadata_providers.suggest_metadata", return_value=[_suggestion()]
+        ):
+            for path in worker._prioritised_paths():
+                worker._process(path)
+        # A mocked lookup returns instantly, so the estimate should fall well
+        # below the seed rather than staying pinned to it.
+        assert worker.seconds_per_lookup < 1.0
+
+    def test_one_slow_response_does_not_swing_the_estimate(self, worker, db, monkeypatch):
+        monkeypatch.setattr("pikaraoke.lib.metadata_lookup_worker.LOOKUP_INTERVAL", 0)
+        _add(db, "/songs/slow.mp4")
+
+        def slow(*args, **kwargs):
+            time.sleep(0.4)
+            return [_suggestion()]
+
+        with patch("pikaraoke.lib.metadata_providers.suggest_metadata", side_effect=slow):
+            worker._process("/songs/slow.mp4")
+        assert worker.seconds_per_lookup == pytest.approx(4.5, abs=1.0)
