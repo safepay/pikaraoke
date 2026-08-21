@@ -288,3 +288,11 @@ body.hide-cursor * {
 .lookup-status .lookup-note {
   opacity: 0.7;
 }
+
+/* Bulma's loader is display:block; inline it so it can sit before the progress
+   text rather than above it. */
+.lookup-spinner {
+  display: inline-block;
+  vertical-align: -0.15em;
+  margin-right: 8px;
+}

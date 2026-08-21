@@ -48,6 +48,9 @@
 				let pref = $(this).attr("data-pref");
 
 				changePreferences(pref, val);
+				// Switching the lookup off means no further progress event, so the
+				// line would otherwise keep claiming work is under way.
+				if (pref === "enable_metadata_lookup") refreshLibraryStats();
 			})
 
 			function changePreferences(pref, val) {
@@ -253,20 +256,20 @@
 				console.error("Failed to fetch system stats");
 			});
 
-			function remaining(seconds) {
+			function duration(seconds) {
 				var mins = Math.round(seconds / 60);
-				if (mins < 1) {
-					// {# MSG: Time left when a background lookup is nearly finished. #}
-					return {{ _('less than a minute left') | tojson }};
-				}
-				if (mins < 60) {
-					// {# MSG: Time left on a background lookup, under an hour. {n} is a number of minutes. #}
-					return {{ _('about {n} minutes left') | tojson }}.replace("{n}", mins);
-				}
-				// {# MSG: Time left on a background lookup, an hour or more. {h} is hours, {m} is minutes. #}
-				return {{ _('about {h}h {m}m left') | tojson }}
+				// {# MSG: A duration under a minute, e.g. "less than a minute left". #}
+				if (mins < 1) return {{ _('less than a minute') | tojson }};
+				// {# MSG: A duration in minutes. {n} is a number. #}
+				if (mins < 60) return {{ _('{n} minutes') | tojson }}.replace("{n}", mins);
+				// {# MSG: A duration of an hour or more, e.g. "2h 15m". {h} is hours, {m} is minutes. #}
+				return {{ _('{h}h {m}m') | tojson }}
 					.replace("{h}", Math.floor(mins / 60))
 					.replace("{m}", mins % 60);
+			}
+
+			function lookupIsOn() {
+				return $("#pref-enable-metadata-lookup").is(":checked");
 			}
 
 			// Song library stats. Polled rather than fetched once: a lookup sweep
@@ -281,11 +284,20 @@
 						.replace("{done}", data.song_count - s.pending)
 						.replace("{total}", data.song_count);
 					// The rate is what the worker has actually been managing, not a
-					// constant: a Pi over wifi is not a desktop on ethernet.
+					// constant: a Pi over wifi is not a desktop on ethernet. The same
+					// figure reads as a forecast before the worker is switched on and
+					// as progress once it is.
+					var running = s.pending > 0 && lookupIsOn();
 					if (s.pending) {
-						progress += "  ·  " + remaining(s.pending * data.seconds_per_lookup);
+						var left = duration(s.pending * data.seconds_per_lookup);
+						progress += "  ·  " + (running
+							// {# MSG: Time left on a running lookup. {t} is a duration such as "23 minutes". #}
+							? {{ _('about {t} left') | tojson }}.replace("{t}", left)
+							// {# MSG: Time the lookup would take, shown while it is switched off. {t} is a duration. #}
+							: {{ _('about {t} once started') | tojson }}.replace("{t}", left));
 					}
 					$("#metadata-looked-up").text(progress);
+					$("#metadata-spinner").toggle(running);
 					// Best outcome first, so the list reads as a funnel down to the
 					// songs nothing could be found for. One row per line: each becomes
 					// a link into the renamer filtered to that state.
@@ -491,7 +503,7 @@
 						{# MSG: Help text explaining what the background lookup does and what it costs. #}
 						{% trans %}Finds the artist, title, year and genre for each song. The first pass over a large library takes hours.{% endtrans %}
 					</p>
-					<p class="mt-4 mb-0" id="metadata-looked-up"></p>
+					<p class="mt-4 mb-0"><span class="loader lookup-spinner" id="metadata-spinner" style="display: none"></span><span id="metadata-looked-up"></span></p>
 					<ul class="is-size-7 lookup-status" id="metadata-status-counts"></ul>
 				</div>
 			</div>
