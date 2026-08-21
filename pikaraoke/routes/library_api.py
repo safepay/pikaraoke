@@ -4,6 +4,7 @@ from flask import jsonify
 from flask_smorest import Blueprint
 
 from pikaraoke.lib.current_app import get_karaoke_instance
+from pikaraoke.lib.metadata_lookup_worker import MAX_ATTEMPTS
 
 library_bp = Blueprint("library", __name__)
 
@@ -15,7 +16,7 @@ def library_stats():
     return jsonify(
         {
             "song_count": len(k.song_manager.songs),
-            "metadata_status": k.db.get_metadata_status_counts(),
+            "metadata_status": k.db.get_metadata_status_counts(MAX_ATTEMPTS),
             "seconds_per_lookup": k.metadata_lookup.seconds_per_lookup,
         }
     )
