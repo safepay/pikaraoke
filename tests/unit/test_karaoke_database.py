@@ -462,7 +462,7 @@ class TestMetadataLookupStaging:
             "/songs/c.mp4",
         }
 
-    def test_matched_and_no_match_are_not_offered(self, db):
+    def test_a_suggestion_or_a_no_match_is_not_offered_again(self, db):
         db.save_suggestion("/songs/a.mp4", "Beyonce", "Halo", 2008, "Pop", 98, "US")
         db.mark_no_match("/songs/b.mp4", "US")
         assert db.get_paths_awaiting_lookup(3) == ["/songs/c.mp4"]
@@ -487,7 +487,7 @@ class TestMetadataLookupStaging:
             "WHERE file_path = ?",
             ("/songs/a.mp4",),
         )[0]
-        assert tuple(row) == ("Beyonce", "Halo", 2008, "Pop", 98, "GB", "matched", 1)
+        assert tuple(row) == ("Beyonce", "Halo", 2008, "Pop", 98, "GB", "suggested", 1)
 
     def test_status_counts_are_zero_filled(self, db):
         db.save_suggestion("/songs/a.mp4", "Beyonce", "Halo", 2008, "Pop", 98, "US")

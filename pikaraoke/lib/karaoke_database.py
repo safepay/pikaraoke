@@ -112,21 +112,31 @@ CREATE INDEX IF NOT EXISTS idx_plays_song ON plays(song_id);
 class MetadataStatus:
     """Lifecycle of a song's online metadata lookup (songs.metadata_status).
 
-    Splits on two questions: has a human seen the row, and did they change
+    Splits on two questions: has a human acted on the row, and did they change
     anything. ACCEPTED and MANUAL are both terminal -- the worker never picks
     them up and a storefront change never re-queues them -- and differ only in
     whose words are on the row.
 
-    |        | machine's answer stands | human changed it |
-    | unseen | MATCHED / NO_MATCH      | --               |
-    | seen   | ACCEPTED                | MANUAL           |
+    |              | machine's answer stands | human changed it |
+    | not acted on | SUGGESTED / NO_MATCH    | --               |
+    | acted on     | ACCEPTED                | MANUAL           |
+
+    Acted on, not seen: no UI event means "a human reviewed this". Rendering the
+    renamer draws the whole library, so only an explicit per-row action may write
+    a human state -- a row nobody touched keeps its machine state and stays in
+    the queue.
+
+    SUGGESTED means the lookup returned something and it was stored, and says
+    nothing about whether it is any good -- a score of 12 is SUGGESTED too.
+    Quality lives in suggested_score alone, which is why every report of these
+    states has to read both.
 
     NO_MATCH is a distinct value rather than an attempt count because the
     storefront reset has to tell it apart from the two terminal states.
     """
 
     PENDING = "pending"
-    MATCHED = "matched"
+    SUGGESTED = "suggested"
     NO_MATCH = "no_match"
     ACCEPTED = "accepted"
     MANUAL = "manual"
@@ -361,11 +371,10 @@ class KaraokeDatabase:
         score: int,
         country: str,
     ) -> None:
-        """Store a lookup result against a song and mark it matched.
+        """Store a lookup result against a song and mark it SUGGESTED.
 
-        MATCHED says a suggestion exists, nothing more. Whether it differs from
-        the name on disk is derived when the renamer draws the row, since the
-        file can be renamed after the lookup.
+        Whether the suggestion differs from the name on disk is derived when the
+        renamer draws the row, since the file can be renamed after the lookup.
         """
         with self._lock, self._conn:
             self._conn.execute(
@@ -386,7 +395,7 @@ class KaraokeDatabase:
                     genre,
                     score,
                     country,
-                    MetadataStatus.MATCHED,
+                    MetadataStatus.SUGGESTED,
                     file_path,
                 ),
             )
@@ -426,7 +435,7 @@ class KaraokeDatabase:
     def get_metadata_status_counts(self) -> dict[str, int]:
         """Return how many songs sit in each reportable lookup state.
 
-        MATCHED splits three ways on the score, because "a suggestion exists"
+        SUGGESTED splits three ways on the score, because "a suggestion exists"
         is not what an admin needs to know. Only ready_to_rename is work
         waiting. Derived here rather than stored, so moving a threshold does not
         strand rows stamped under the old one.
@@ -445,7 +454,7 @@ class KaraokeDatabase:
                   FROM songs
                  GROUP BY state
                 """,
-                (MetadataStatus.MATCHED, MetadataStatus.PENDING),
+                (MetadataStatus.SUGGESTED, MetadataStatus.PENDING),
             ).fetchall()
         counts = {
             MetadataStatus.PENDING: 0,
@@ -482,7 +491,7 @@ class KaraokeDatabase:
                 """,
                 (
                     MetadataStatus.PENDING,
-                    MetadataStatus.MATCHED,
+                    MetadataStatus.SUGGESTED,
                     MetadataStatus.NO_MATCH,
                     country,
                 ),

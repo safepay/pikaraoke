@@ -60,7 +60,7 @@ class TestLookup:
             "metadata_status FROM songs WHERE file_path = ?",
             ("/songs/halo.mp4",),
         )[0]
-        assert tuple(row) == ("Beyonce", "Halo", 2008, "Pop", 98, "matched")
+        assert tuple(row) == ("Beyonce", "Halo", 2008, "Pop", 98, "suggested")
 
     def test_no_results_lands_on_no_match(self, worker, db):
         _add(db, "/songs/obscure.mp4")
