@@ -44,7 +44,7 @@ def delayed_halt(cmd: int, k: Karaoke):
         os.system("reboot")
 
 
-@admin_bp.route("/update_ytdl")
+@admin_bp.route("/update_ytdl", methods=["POST"])
 def update_ytdl():
     """Update yt-dlp to the latest version."""
     k = get_karaoke_instance()
@@ -82,7 +82,7 @@ def library_stats():
     )
 
 
-@admin_bp.route("/sync_library")
+@admin_bp.route("/sync_library", methods=["POST"])
 def sync_library():
     """Trigger a background library scan."""
     if not is_admin():
@@ -94,7 +94,7 @@ def sync_library():
     return jsonify({"status": "already_syncing"})
 
 
-@admin_bp.route("/quit")
+@admin_bp.route("/quit", methods=["POST"])
 def quit():
     """Exit the PiKaraoke application."""
     k = get_karaoke_instance()
@@ -111,7 +111,7 @@ def quit():
     return redirect(url_for("home.home"))
 
 
-@admin_bp.route("/shutdown")
+@admin_bp.route("/shutdown", methods=["POST"])
 def shutdown():
     """Shut down the host system."""
     k = get_karaoke_instance()
@@ -128,7 +128,7 @@ def shutdown():
     return redirect(url_for("home.home"))
 
 
-@admin_bp.route("/reboot")
+@admin_bp.route("/reboot", methods=["POST"])
 def reboot():
     """Reboot the host system."""
     k = get_karaoke_instance()
@@ -145,7 +145,7 @@ def reboot():
     return redirect(url_for("home.home"))
 
 
-@admin_bp.route("/expand_fs")
+@admin_bp.route("/expand_fs", methods=["POST"])
 def expand_fs():
     """Expand filesystem on Raspberry Pi."""
     k = get_karaoke_instance()
@@ -179,7 +179,15 @@ def auth(form):
         resp = make_response(redirect(next_url))
         expire_date = datetime.datetime.now()
         expire_date = expire_date + datetime.timedelta(days=90)
-        resp.set_cookie("admin", admin_password, expires=expire_date)
+        # Not secure=True: PiKaraoke serves plain HTTP on a LAN, so the browser
+        # would never send the cookie back.
+        resp.set_cookie(
+            "admin",
+            admin_password,
+            expires=expire_date,
+            httponly=True,
+            samesite="Lax",
+        )
         # MSG: Message shown after logging in as admin successfully
         flash(_("Admin mode granted!"), "is-success")
     else:
@@ -193,7 +201,7 @@ def auth(form):
 def logout():
     """Log out of admin mode."""
     resp = make_response(redirect(url_for("info.info")))
-    resp.set_cookie("admin", "")
+    resp.set_cookie("admin", "", httponly=True, samesite="Lax")
     # MSG: Message shown after logging out as admin successfully
     flash(_("Logged out of admin mode!"), "is-success")
     return resp
