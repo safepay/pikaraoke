@@ -1,6 +1,7 @@
 """Background lookup of song metadata, so the renamer never calls the network."""
 
 import logging
+from datetime import datetime, timezone
 
 from gevent import Greenlet, sleep, spawn
 
@@ -52,19 +53,38 @@ class MetadataLookupWorker:
             if not self.enabled:
                 sleep(IDLE_INTERVAL)
                 continue
-            batch = self._prioritised_paths()
-            if not batch:
+            # Read before the backlog, so anything inserted afterwards is an
+            # arrival rather than a row this sweep already holds.
+            started = _utc_now()
+            backlog = self._prioritised_paths()
+            if not backlog:
                 sleep(IDLE_INTERVAL)
                 continue
-            for path in batch:
+            for path in backlog:
                 if not self.enabled:
                     break
-                self._look_up(path)
-                # Per song, so the settings page counts up while it is watched.
-                # The event carries no payload; only an open settings page acts
-                # on it, by refetching one grouped count.
-                self._events.emit("metadata_lookup_progress")
-                sleep(LOOKUP_INTERVAL)
+                self._sweep_arrivals(started)
+                self._process(path)
+
+    def _sweep_arrivals(self, since: str) -> None:
+        """Look up songs the library gained mid-sweep, before continuing.
+
+        A download nobody is waiting on is not why the feature exists. Left in
+        the backlog a new song waits out the whole pass, and a YouTube name that
+        tidies cleanly sorts to the very back of it.
+        """
+        for path in self._db.get_paths_awaiting_lookup(MAX_ATTEMPTS, added_since=since):
+            if not self.enabled:
+                return
+            self._process(path)
+
+    def _process(self, path: str) -> None:
+        self._look_up(path)
+        # Per song, so the settings page counts up while it is watched. The
+        # event carries no payload; only an open settings page acts on it, by
+        # refetching one grouped count.
+        self._events.emit("metadata_lookup_progress")
+        sleep(LOOKUP_INTERVAL)
 
     def _prioritised_paths(self) -> list[str]:
         """Pending paths, unusable names first.
@@ -124,6 +144,11 @@ class MetadataLookupWorker:
             score=best["score"],
             country=country,
         )
+
+
+def _utc_now() -> str:
+    """Now, matching the format SQLite's CURRENT_TIMESTAMP writes to created_at."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _as_year(value: object) -> int | None:
