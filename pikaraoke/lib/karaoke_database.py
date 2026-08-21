@@ -112,13 +112,23 @@ CREATE INDEX IF NOT EXISTS idx_plays_song ON plays(song_id);
 class MetadataStatus:
     """Lifecycle of a song's online metadata lookup (songs.metadata_status).
 
-    MANUAL is terminal; every other state is re-queued by a storefront change,
-    which is why NO_MATCH is a distinct value rather than an attempt count.
+    Splits on two questions: has a human seen the row, and did they change
+    anything. ACCEPTED and MANUAL are both terminal -- the worker never picks
+    them up and a storefront change never re-queues them -- and differ only in
+    whose words are on the row.
+
+    |        | machine's answer stands | human changed it |
+    | unseen | MATCHED / NO_MATCH      | --               |
+    | seen   | ACCEPTED                | MANUAL           |
+
+    NO_MATCH is a distinct value rather than an attempt count because the
+    storefront reset has to tell it apart from the two terminal states.
     """
 
     PENDING = "pending"
     MATCHED = "matched"
     NO_MATCH = "no_match"
+    ACCEPTED = "accepted"
     MANUAL = "manual"
 
 
@@ -443,6 +453,7 @@ class KaraokeDatabase:
             "ready_to_rename": 0,
             "needs_review": 0,
             MetadataStatus.NO_MATCH: 0,
+            MetadataStatus.ACCEPTED: 0,
             MetadataStatus.MANUAL: 0,
         }
         for state, count in rows:

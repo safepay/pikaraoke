@@ -497,8 +497,28 @@ class TestMetadataLookupStaging:
             "ready_to_rename": 1,
             "needs_review": 0,
             "no_match": 0,
+            "accepted": 0,
             "manual": 0,
         }
+
+    def test_the_human_states_are_counted_separately(self, db):
+        # accepted and manual both mean a person has seen the row; they differ
+        # only in whether that person changed anything.
+        db.execute(
+            "UPDATE songs SET metadata_status = 'accepted' WHERE file_path = ?", ("/songs/a.mp4",)
+        )
+        db.execute(
+            "UPDATE songs SET metadata_status = 'manual' WHERE file_path = ?", ("/songs/b.mp4",)
+        )
+        counts = db.get_metadata_status_counts()
+        assert (counts["accepted"], counts["manual"], counts["pending"]) == (1, 1, 1)
+
+    def test_a_reviewed_song_is_never_looked_up_again(self, db):
+        for path, status in (("/songs/a.mp4", "accepted"), ("/songs/b.mp4", "manual")):
+            db.execute("UPDATE songs SET metadata_status = ? WHERE file_path = ?", (status, path))
+        assert db.get_paths_awaiting_lookup(3) == ["/songs/c.mp4"]
+        db.clear_unconfirmed_suggestions("JP")
+        assert db.get_paths_awaiting_lookup(3) == ["/songs/c.mp4"]
 
     def test_a_confirmed_match_splits_on_whether_a_rename_is_waiting(self, db):
         # 100 means the name on disk is already the proposal; 95 and 98 mean it

@@ -317,7 +317,12 @@
 						// {# MSG: Songs iTunes had no result for. #}
 						[s.no_match, {{ _('no match') | tojson }}, ""]
 					];
-					// {# MSG: Songs renamed by a person, which are never looked up again. #}
+					// The two human states are hidden while empty: nothing writes them
+					// until the renamer records what a person decided, and a row that
+					// can only read zero teaches the reader to skip the list.
+					// {# MSG: Songs a person reviewed and left as the lookup found them. #}
+					if (s.accepted) rows.push([s.accepted, {{ _('accepted') | tojson }}, ""]);
+					// {# MSG: Songs a person edited by hand, which are never looked up again. #}
 					if (s.manual) rows.push([s.manual, {{ _('named by hand') | tojson }}, ""]);
 					$("#metadata-status-counts").empty().append(rows.map(function(row) {
 						var li = $("<li>")
