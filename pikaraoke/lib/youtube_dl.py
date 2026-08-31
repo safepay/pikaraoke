@@ -131,6 +131,22 @@ def upgrade_youtubedl() -> str:
     return youtubedl_version
 
 
+# Prefixes on the lines the templates below produce, read back by DownloadManager.
+PROGRESS_PREFIX = "[pk]|"
+POSTPROCESS_PREFIX = "[pk-post]|"
+SIZE_PREFIX = "[pk-size]|"
+
+# Pipe-delimited: speed and ETA render as "Unknown B/s" when yt-dlp has no estimate, so
+# whitespace splitting breaks exactly when the download is struggling.
+_DOWNLOAD_PROGRESS_TEMPLATE = (
+    f"download:{PROGRESS_PREFIX}%(progress._percent_str)s|%(progress._speed_str)s"
+    "|%(progress._eta_str)s|%(info.vcodec)s"
+)
+_POSTPROCESS_PROGRESS_TEMPLATE = f"postprocess:{POSTPROCESS_PREFIX}%(progress.postprocessor)s"
+# Both formats' sizes, emitted once before the first byte.
+_SIZE_PRINT_TEMPLATE = f"before_dl:{SIZE_PREFIX}%(requested_formats.:.filesize,filesize_approx)s"
+
+
 def build_ytdl_download_command(
     video_url: str,
     download_path: str,
@@ -166,6 +182,15 @@ def build_ytdl_download_command(
     args = [
         "-f",
         file_quality,
+        "--newline",
+        "--progress-template",
+        _DOWNLOAD_PROGRESS_TEMPLATE,
+        "--progress-template",
+        _POSTPROCESS_PROGRESS_TEMPLATE,
+        "--print",
+        _SIZE_PRINT_TEMPLATE,
+        # --print implies --quiet, which would silence the progress lines above.
+        "--no-quiet",
         "-o",
         dl_path,
         "-S",
@@ -226,16 +251,23 @@ PREVIEW_FORMAT = (
     "/worst[protocol=https][vcodec!=none][acodec!=none]"
 )
 
-# YouTube answers 403 to a freshly resolved itag 18 URL often enough that it has to be
-# proven here: downloads survive it by retrying, a <video> element gets one attempt.
-# Two consecutive refusals then a working URL is a routinely observed sequence.
+# The SABR rollout is session-dependent, so even a good client is occasionally refused,
+# and a <video> element gets one attempt at a bad URL.
 _PREVIEW_ATTEMPTS = 3
 _VERIFY_TIMEOUT_SECONDS = 5
 
 
 def _resolve_stream_url(video_url: str) -> str | None:
     """Ask yt-dlp for a progressive stream URL. No guarantee it will serve bytes."""
-    cmd = yt_dlp_cmd + ["-g", "-f", PREVIEW_FORMAT] + _js_runtime_args()
+    # YouTube refuses the stream URLs yt-dlp's default client resolves, but serves android's.
+    cmd = yt_dlp_cmd + [
+        "-g",
+        "-f",
+        PREVIEW_FORMAT,
+        "--extractor-args",
+        "youtube:player_client=android",
+    ]
+    cmd += _js_runtime_args()
     cmd += [video_url]
     logging.debug(f"yt-dlp get stream URL command: {' '.join(cmd)}")
     try:

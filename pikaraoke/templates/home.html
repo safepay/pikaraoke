@@ -89,7 +89,7 @@
 			"input",
 			debounce(function (event) {
 				const value = this.value;
-				$.get(window.pikaraokeConfig.basePath + "/volume/" + value);
+				$.post(window.pikaraokeConfig.basePath + "/volume/" + value);
 			}, 500)
 		);
 
@@ -102,29 +102,29 @@
 			}
 			r = confirm(window.translations.confirmTranspose.replace("{label}", getSemitonesLabel(value)));
 			if (r) {
-				$.get(window.pikaraokeConfig.basePath + "/transpose/" + value);
+				$.post(window.pikaraokeConfig.basePath + "/transpose/" + value);
 			}
 			slider.value = 0;
 			output.innerHTML = getSemitonesLabel(slider.value);
 		});
 
 		$("#pause-resume").click(function () {
-			$.get(window.pikaraokeConfig.basePath + "/pause");
+			$.post(window.pikaraokeConfig.basePath + "/pause");
 			togglePausePlayButton();
 		});
 
 		$("#vol-up").click(function () {
-			$.get(window.pikaraokeConfig.basePath + "/vol_up");
+			$.post(window.pikaraokeConfig.basePath + "/vol_up");
 		});
 
 		$("#vol-down").click(function () {
-			$.get(window.pikaraokeConfig.basePath + "/vol_down");
+			$.post(window.pikaraokeConfig.basePath + "/vol_down");
 		});
 
 		$("#restart").click(function () {
 			r = confirm(window.translations.confirmRestartTrack);
 			if (r) {
-				$.get(window.pikaraokeConfig.basePath + "/restart");
+				$.post(window.pikaraokeConfig.basePath + "/restart");
 			}
 		});
 
@@ -134,7 +134,7 @@
 				{{ _("Are you sure you want to skip this track? If you didn't add this song, ask permission first!") | tojson }}
 			);
 			if (r) {
-				$.get(window.pikaraokeConfig.basePath + "/skip");
+				$.post(window.pikaraokeConfig.basePath + "/skip");
 			}
 		});
 
@@ -230,17 +230,15 @@
 		{% endif %}
 	});
 </script>
-{% endblock %} {% block header %}
-<h1>
-	{% block title %} {# MSG: Header showing the currently playing song. #} {% trans %}Now Playing{% endtrans %}
-	<img
-		style="display: none"
-		class="playing_gif control-box"
-		width="40"
-		src="{{  url_for('static', filename='images/now-playing.png') }}"
-	/>{% endblock %}
-</h1>
-{% endblock %} {% block content %}
+{% endblock %} {% block heading %}{{ title }}
+<img
+	style="display: none"
+	class="playing_gif control-box"
+	width="40"
+	src="{{  url_for('static', filename='images/now-playing.png') }}"
+/>{% endblock %}
+
+{% block content %}
 
 <p class="is-size-4 has-text-warning" id="now-playing">&nbsp;</p>
 

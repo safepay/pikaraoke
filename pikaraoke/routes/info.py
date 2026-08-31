@@ -8,8 +8,9 @@ from flask_smorest import Blueprint
 from pikaraoke import VERSION
 from pikaraoke.constants import ITUNES_COUNTRIES, LANGUAGES, per_page_options
 from pikaraoke.lib import keep_awake
+from pikaraoke.lib.auth import answers_json, public
 from pikaraoke.lib.current_app import (
-    get_admin_password,
+    get_admin_auth,
     get_karaoke_instance,
     get_site_name,
     is_admin,
@@ -23,12 +24,12 @@ info_bp = Blueprint("info", __name__)
 
 
 @info_bp.route("/info")
+@public
 def info():
     """System information and settings page."""
     k = get_karaoke_instance()
     site_name = get_site_name()
     url = k.url
-    admin_password = get_admin_password()
     is_linux_platform = is_linux()
 
     preferred_language = k.preferences.get("preferred_language", "en")
@@ -40,10 +41,11 @@ def info():
     return render_template(
         "info.html",
         site_title=site_name,
-        title="Info",
+        # MSG: Title of the settings and system information page.
+        title=_("Settings"),
         url=url,
         admin=is_admin(),
-        admin_password=admin_password,
+        admin_password_set=get_admin_auth().is_password_set(),
         platform=k.platform,
         os_version=k.os_version,
         ffmpeg_version=k.ffmpeg_version,
@@ -99,15 +101,13 @@ def info():
 
 
 @info_bp.route("/info/stats")
+@answers_json
 def get_system_stats():
     """Get system statistics (CPU, Memory, Disk).
 
     Returns:
         JSON response with system stats.
     """
-    if not is_admin():
-        return jsonify({"error": "Unauthorized"}), 403
-
     # cpu
     try:
         # We can afford to block a bit here since it is async

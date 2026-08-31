@@ -17,7 +17,7 @@ from pikaraoke.lib.events import EventSystem
 from pikaraoke.lib.metadata_parser import sanitize_filename
 from pikaraoke.lib.song_manager import SongManager
 from pikaraoke.routes.files import files_bp
-from tests.conftest import make_route_app
+from tests.conftest import StubAdminAuth, make_route_app
 
 
 @pytest.fixture
@@ -78,10 +78,10 @@ def _browse(
     k = k if k is not None else _karaoke(app, songs, per_page, folders)
     if cookie is not None:
         client.set_cookie("browse_per_page", cookie)
+    app.config["ADMIN_AUTH"] = StubAdminAuth(admin)
     with (
         patch("pikaraoke.routes.files.get_karaoke_instance", return_value=k),
         patch("pikaraoke.routes.files.get_site_name", return_value="PiKaraoke"),
-        patch("pikaraoke.routes.files.is_admin", return_value=admin),
     ):
         return client.get("/browse" + query)
 
@@ -328,11 +328,12 @@ class TestPartialFragment:
         assert "partial" not in body
 
 
-def _patched(k, admin=True):
+def _patched(client, k, admin=True):
+    """The gate and the route both read ADMIN_AUTH, so `admin` is set once."""
+    client.application.config["ADMIN_AUTH"] = StubAdminAuth(admin)
     return (
         patch("pikaraoke.routes.files.get_karaoke_instance", return_value=k),
         patch("pikaraoke.routes.files.get_site_name", return_value="PiKaraoke"),
-        patch("pikaraoke.routes.files.is_admin", return_value=admin),
     )
 
 
@@ -340,14 +341,14 @@ def _post_rename(client, k, admin=True, **form):
     """POST /files/edit with the given form fields."""
     form = {"old_file_name": "/songs/Old.mp4", "new_file_name": "New", **form}
     with contextlib.ExitStack() as stack:
-        for ctx in _patched(k, admin):
+        for ctx in _patched(client, k, admin):
             stack.enter_context(ctx)
         return client.post("/files/edit", data=form)
 
 
 def _get_edit(client, k, song, admin=True):
     with contextlib.ExitStack() as stack:
-        for ctx in _patched(k, admin):
+        for ctx in _patched(client, k, admin):
             stack.enter_context(ctx)
         return client.get(f"/files/edit?song={song}&referrer=/queue")
 
@@ -379,8 +380,8 @@ class TestRenamePermission:
         k = MagicMock()
         response = _post_rename(client, k, admin=False, referrer="/queue")
         assert response.status_code == 302
-        assert response.headers["Location"] == "/queue"
-        k.song_manager.rename.assert_not_called()
+        assert response.headers["Location"] == "/"
+        k.song_manager.rename.assert_not_called()  # pylint: disable=no-member
 
 
 class TestRenameThePlayingSong:
@@ -451,6 +452,14 @@ class TestRenameFailuresKeepYourWork:
         assert response.status_code == 200
         assert "already exists" in response.data.decode()
         k.rename_song.assert_not_called()
+
+    def test_changing_only_the_case_is_not_a_collision(self, client, app, existing_song):
+        """On NTFS and APFS the target 'exists' only because it is this very song."""
+        k = _karaoke_for_rename()
+        new_name = existing_song.stem.upper()
+        response = self._submit(client, k, existing_song, new_file_name=new_name)
+        assert response.status_code == 302
+        k.rename_song.assert_called_once_with(str(existing_song), new_name)
 
     def test_saving_the_name_it_already_has_is_not_a_collision(self, client, app, existing_song):
         """A song that already fits the naming convention is done, not in conflict with itself."""

@@ -9,6 +9,9 @@ import requests
 
 from pikaraoke.lib.youtube_dl import (
     _PREVIEW_ATTEMPTS,
+    POSTPROCESS_PREFIX,
+    PROGRESS_PREFIX,
+    SIZE_PREFIX,
     _serves_bytes,
     build_ytdl_download_command,
     get_stream_url,
@@ -147,6 +150,28 @@ class TestBuildYtdlDownloadCommand:
         assert tiers[2] == "best[ext!=webm]"
 
     @patch("pikaraoke.lib.youtube_dl.get_installed_js_runtime", return_value=None)
+    def test_progress_templates(self, mock_js):
+        """The download panel reads these templates, not yt-dlp's prose."""
+        cmd = build_ytdl_download_command(
+            video_url="https://www.youtube.com/watch?v=test123",
+            download_path="/songs",
+        )
+        assert "--newline" in cmd
+        templates = [cmd[i + 1] for i, arg in enumerate(cmd) if arg == "--progress-template"]
+        assert len(templates) == 2
+        download, postprocess = templates
+        assert download.startswith(f"download:{PROGRESS_PREFIX}")
+        # The discriminator for which pass of a "+" selector is running.
+        assert "%(info.vcodec)s" in download
+        assert postprocess == f"postprocess:{POSTPROCESS_PREFIX}%(progress.postprocessor)s"
+        # Both formats' sizes, printed before the first byte; no progress line carries them.
+        size = cmd[cmd.index("--print") + 1]
+        assert size.startswith(f"before_dl:{SIZE_PREFIX}")
+        assert "requested_formats" in size
+        # --print implies --quiet, which silences every progress line above it.
+        assert "--no-quiet" in cmd
+
+    @patch("pikaraoke.lib.youtube_dl.get_installed_js_runtime", return_value=None)
     def test_with_proxy(self, mock_js):
         """Test command with proxy setting."""
         cmd = build_ytdl_download_command(
@@ -250,6 +275,15 @@ class TestGetStreamUrl:
             assert "[vcodec!=none][acodec!=none]" in fmt
 
     @patch("pikaraoke.lib.youtube_dl.get_installed_js_runtime", return_value=None)
+    def test_requests_android_player_client(self, mock_js):
+        """Test the client is pinned; the default resolves itag 18 then is refused on it."""
+        with self._run_with_output(b"https://rr1.googlevideo.com/videoplayback?x=1\n") as mock_run:
+            with self._serving(True):
+                get_stream_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+            cmd = mock_run.call_args[0][0]
+            assert cmd[cmd.index("--extractor-args") + 1] == "youtube:player_client=android"
+
+    @patch("pikaraoke.lib.youtube_dl.get_installed_js_runtime", return_value=None)
     def test_returns_progressive_url(self, mock_js):
         """Test that a verified progressive URL is returned."""
         url = "https://rr1.googlevideo.com/videoplayback?itag=18"
@@ -347,14 +381,12 @@ class TestUpgradeYoutubedl:
         error = subprocess.CalledProcessError(1, "yt-dlp", pip_message)
         error.output = pip_message
 
-        with patch(
-            "pikaraoke.lib.youtube_dl.get_youtubedl_version", return_value="2024.02.01"
-        ), patch("shutil.which", return_value=None), patch(
-            "subprocess.check_output"
-        ) as mock_check, patch(
-            "pikaraoke.lib.youtube_dl.sys.prefix", "/venv"
-        ), patch(
-            "pikaraoke.lib.youtube_dl.sys.base_prefix", "/different"
+        with (
+            patch("pikaraoke.lib.youtube_dl.get_youtubedl_version", return_value="2024.02.01"),
+            patch("shutil.which", return_value=None),
+            patch("subprocess.check_output") as mock_check,
+            patch("pikaraoke.lib.youtube_dl.sys.prefix", "/venv"),
+            patch("pikaraoke.lib.youtube_dl.sys.base_prefix", "/different"),
         ):
             # First call raises error suggesting pip, second call succeeds
             mock_check.side_effect = [error, b"Successfully installed yt-dlp"]
@@ -374,14 +406,12 @@ class TestUpgradeYoutubedl:
         error = subprocess.CalledProcessError(1, "yt-dlp", pip_message)
         error.output = pip_message
 
-        with patch(
-            "pikaraoke.lib.youtube_dl.get_youtubedl_version", return_value="2024.02.01"
-        ), patch("shutil.which", return_value=None), patch(
-            "subprocess.check_output"
-        ) as mock_check, patch(
-            "pikaraoke.lib.youtube_dl.sys.prefix", "/usr"
-        ), patch(
-            "pikaraoke.lib.youtube_dl.sys.base_prefix", "/usr"
+        with (
+            patch("pikaraoke.lib.youtube_dl.get_youtubedl_version", return_value="2024.02.01"),
+            patch("shutil.which", return_value=None),
+            patch("subprocess.check_output") as mock_check,
+            patch("pikaraoke.lib.youtube_dl.sys.prefix", "/usr"),
+            patch("pikaraoke.lib.youtube_dl.sys.base_prefix", "/usr"),
         ):
             # First call raises error suggesting pip, second call succeeds
             mock_check.side_effect = [error, b"Successfully installed yt-dlp"]

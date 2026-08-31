@@ -10,6 +10,7 @@ from flask import flash, redirect, render_template, request, url_for
 from flask_smorest import Blueprint
 from marshmallow import Schema, fields
 
+from pikaraoke.lib.auth import answers_json, public
 from pikaraoke.lib.current_app import (
     broadcast_event,
     get_karaoke_instance,
@@ -31,13 +32,6 @@ class ReorderForm(Schema):
     )
 
 
-class EnqueueQuery(Schema):
-    song = fields.String(required=True, metadata={"description": "Path to the song file"})
-    user = fields.String(
-        load_default="", metadata={"description": "Name of the user adding the song"}
-    )
-
-
 class EnqueueForm(Schema):
     song_to_add = fields.String(required=True, metadata={"description": "Path to the song file"})
     song_added_by = fields.String(
@@ -53,6 +47,7 @@ class QueueEditQuery(Schema):
 
 
 @queue_bp.route("/queue")
+@public
 def queue():
     """Queue management page."""
     k = get_karaoke_instance()
@@ -61,12 +56,14 @@ def queue():
         "queue.html",
         queue=k.queue_manager.queue,
         site_title=site_name,
-        title="Queue",
+        # MSG: Title of the queue page.
+        title=_("Queue"),
         admin=is_admin(),
     )
 
 
 @queue_bp.route("/get_queue")
+@public
 def get_queue():
     """Get the current song queue."""
     k = get_karaoke_instance()
@@ -76,9 +73,6 @@ def get_queue():
 @queue_bp.route("/queue/addrandom/<int:amount>", methods=["POST"])
 def add_random(amount):
     """Add random songs to the queue."""
-    if not is_admin():
-        flash(_("You don't have permission to add random songs"), "is-danger")
-        return redirect(url_for("queue.queue"))
     k = get_karaoke_instance()
     rc = k.queue_manager.queue_add_random(amount)
     if rc:
@@ -92,12 +86,10 @@ def add_random(amount):
 
 
 @queue_bp.route("/queue/reorder", methods=["POST"])
+@answers_json
 @queue_bp.arguments(ReorderForm, location="form")
 def reorder(form):
     """Handle drag-and-drop reordering of the queue."""
-    if not is_admin():
-        return json.dumps({"success": False, "error": "Unauthorized"}), 403
-
     k = get_karaoke_instance()
     try:
         success = k.queue_manager.reorder(form["old_index"], form["new_index"])
@@ -113,13 +105,6 @@ def reorder(form):
 def queue_edit(query):
     """Edit queue items (admin only)."""
     is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
-
-    if not is_admin():
-        if is_ajax:
-            return json.dumps({"success": False, "error": "Unauthorized"}), 403
-        # MSG: Message shown when non-admin tries to edit queue
-        flash(_("Unauthorized"), "is-danger")
-        return redirect(url_for("queue.queue"))
 
     k = get_karaoke_instance()
     action = query["action"]
@@ -185,21 +170,16 @@ def _do_enqueue(song: str, user: str) -> str:
     return json.dumps({"song": song_title, "success": rc})
 
 
-@queue_bp.route("/enqueue", methods=["GET"])
-@queue_bp.arguments(EnqueueQuery, location="query")
-def enqueue(query):
-    """Add a song to the queue (used by the file browser)."""
-    return _do_enqueue(query["song"], query["user"])
-
-
 @queue_bp.route("/enqueue", methods=["POST"])
+@public
 @queue_bp.arguments(EnqueueForm, location="form")
 def enqueue_form(form):
-    """Add a song to the queue (used by the search page)."""
+    """Add a song to the queue."""
     return _do_enqueue(form["song_to_add"], form["song_added_by"])
 
 
 @queue_bp.route("/queue/downloads")
+@public
 def get_current_downloads():
     """Get the status of current and pending downloads."""
     k = get_karaoke_instance()
@@ -207,6 +187,7 @@ def get_current_downloads():
 
 
 @queue_bp.route("/queue/downloads/errors/<error_id>", methods=["DELETE"])
+@public
 def delete_download_error(error_id):
     """Remove a download error from the list."""
     k = get_karaoke_instance()
@@ -216,6 +197,7 @@ def delete_download_error(error_id):
 
 
 @queue_bp.route("/queue/downloads/errors/<error_id>/retry", methods=["POST"])
+@public
 def retry_download_error(error_id):
     """Re-queue a failed download."""
     k = get_karaoke_instance()

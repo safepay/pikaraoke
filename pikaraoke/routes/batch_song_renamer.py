@@ -1,23 +1,19 @@
+import logging
 import os
 import re
-import time
 import unicodedata
 
 import flask_babel
-from flask import (
-    jsonify,
-    redirect,
-    render_template,
-    render_template_string,
-    request,
-    url_for,
-)
+from flask import Response, jsonify, render_template, render_template_string, request
 from flask_paginate import Pagination
 from flask_smorest import Blueprint
 from marshmallow import Schema, fields
 
-from pikaraoke.lib.current_app import get_karaoke_instance, get_site_name, is_admin
-from pikaraoke.lib.metadata_parser import clear_song_name_cache, get_song_correct_name
+from pikaraoke.karaoke import SongInUseError
+from pikaraoke.lib.auth import answers_json
+from pikaraoke.lib.current_app import get_karaoke_instance, get_site_name
+from pikaraoke.lib.metadata_parser import get_song_correct_name, youtube_id_suffix
+from pikaraoke.lib.song_manager import rename_collides
 
 _ = flask_babel.gettext
 
@@ -125,16 +121,13 @@ def _names_match(name: str, correct_name: str | None) -> bool:
     return normalized_name == normalized_correct
 
 
-def _error_response(message: str) -> dict:
-    return {"success": False, "message": message, "categoryClass": "is-danger"}
+def _error(message: str) -> Response:
+    return jsonify({"success": False, "message": message, "categoryClass": "is-danger"})
 
 
 @batch_song_renamer_bp.route("/batch-song-renamer", methods=["GET"])
 def browse():
     """Batch song renamer page."""
-    if not is_admin():
-        return redirect(url_for("files.browse"))
-
     site_name = get_site_name()
     show_all_songs = request.args.get("show_all_songs") == "true"
 
@@ -156,9 +149,6 @@ def browse():
 @batch_song_renamer_bp.route("/batch-song-renamer/get-all-songs/<int:page>", methods=["GET"])
 def get_all_songs(page):
     """Get all songs with suggested renames."""
-    if not is_admin():
-        return redirect(url_for("files.browse"))
-
     start_index = (page - 1) * RESULTS_PER_PAGE
 
     k = get_karaoke_instance()
@@ -192,9 +182,6 @@ def get_all_songs(page):
 @batch_song_renamer_bp.arguments(GetSongsToRenameQuery, location="query")
 def get_songs_to_rename(query):
     """Get songs that have rename suggestions different from their current name."""
-    if not is_admin():
-        return redirect(url_for("files.browse"))
-
     song_index = query["song_index"]
     page = query["page"]
 
@@ -226,48 +213,40 @@ def get_songs_to_rename(query):
 
 
 @batch_song_renamer_bp.route("/batch-song-renamer/rename-song", methods=["POST"])
+@answers_json
 @batch_song_renamer_bp.arguments(RenameSongForm, location="form")
 def rename_song(form):
     """Rename a song file."""
     k = get_karaoke_instance()
-
-    if "new_name" not in form or "old_name" not in form:
-        # MSG: Message shown after trying to edit a song without specifying the filename.
-        return jsonify(_error_response(_("Error: No filename parameters were specified!")))
-
-    new_name = form["new_name"].strip()
     old_name = form["old_name"]
+    # The proposal is a display name. The YouTube id lives only in the
+    # filename, and nothing can recover it once a rename drops it.
+    new_name = form["new_name"].strip() + youtube_id_suffix(old_name)
 
-    if k.queue_manager.is_song_in_queue(old_name):
-        # MSG: Message shown after trying to edit a song that is in the queue.
-        return jsonify(
-            _error_response(
-                _("Error: Can't edit this song because it is in the current queue: ") + old_name
-            )
+    if k.is_song_in_use(old_name):
+        # MSG: Message shown after trying to edit a song that is queued or playing.
+        return _error(
+            _("Error: Can't edit this song because it is queued or playing: %s") % old_name
         )
 
-    file_extension = os.path.splitext(old_name)[1]
-    old_filename = k.song_manager.filename_from_path(old_name, remove_youtube_id=False)
-    new_full_path = os.path.join(k.song_manager.download_path, new_name + file_extension)
-    is_case_only_rename = old_filename.lower() == new_name.lower() and old_filename != new_name
-
-    # Block renaming to an existing file (unless it's just a case change)
-    if os.path.isfile(new_full_path) and not is_case_only_rename:
+    target = k.song_manager.rename_target(old_name, new_name)
+    if rename_collides(old_name, target):
         # MSG: Message shown after trying to rename a file to a name that already exists.
-        return jsonify(
-            _error_response(
-                _("Error renaming file: '%s' to '%s', Filename already exists")
-                % (old_name, new_name + file_extension)
-            )
+        return _error(
+            _("Error renaming file: '%s' to '%s', Filename already exists")
+            % (old_name, os.path.basename(target))
         )
 
-    if is_case_only_rename:
-        # Two-step rename for case-insensitive filesystems (e.g. Windows)
-        temp_name = f"{new_name}_temp_{int(time.time() * 1000)}"
-        k.song_manager.rename(old_name, temp_name)
-        temp_path = os.path.join(k.song_manager.download_path, temp_name + file_extension)
-        k.song_manager.rename(temp_path, new_name)
-    else:
-        k.song_manager.rename(old_name, new_name)
+    try:
+        new_path = k.rename_song(old_name, new_name)
+    except SongInUseError:
+        # MSG: Message shown when the song being renamed started playing mid-edit.
+        return _error(
+            _("This song started playing while you were editing it. Rename it when it finishes.")
+        )
+    except OSError as e:
+        logging.error(f"Error renaming file: {e}")
+        # MSG: Message shown after a rename failed. Followed by the system error.
+        return _error(_("Error renaming file: %s") % e)
 
-    return jsonify({"success": True, "new_file_name": new_full_path})
+    return jsonify({"success": True, "new_file_name": new_path})

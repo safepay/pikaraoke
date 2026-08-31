@@ -1,22 +1,17 @@
 """Play history pages: session management, the play log, and rankings."""
 
 import flask_babel
-from flask import flash, redirect, render_template, request, url_for
+from flask import render_template
 from flask_smorest import Blueprint
 from marshmallow import Schema, fields, validate
 
+from pikaraoke.lib.auth import public
 from pikaraoke.lib.current_app import get_karaoke_instance, get_site_name, is_admin
 from pikaraoke.lib.play_history_manager import SESSION_NAME_MAX_LENGTH
 
 _ = flask_babel.gettext
 
 sessions_bp = Blueprint("sessions", __name__)
-
-# What the room came for: the log a guest looks up to queue something they sang
-# last time, and the charts everyone wants to see. Managing sessions stays with
-# the host. Deny by default, with an allowlist, so a page added here is
-# host-only until someone decides otherwise.
-_PUBLIC_ENDPOINTS = {"sessions.history", "sessions.rankings"}
 
 # Sized to the table rather than shared, because the two differ by roughly the
 # number of songs in a night: sessions gain a row per night and total in the
@@ -54,16 +49,6 @@ class HistoryQuery(Schema):
     youtube_id = fields.String(load_default="", metadata={"description": "Song's YouTube id"})
 
 
-@sessions_bp.before_request
-def require_admin():
-    """Gate every page in this blueprint that is not named in _PUBLIC_ENDPOINTS."""
-    if request.endpoint in _PUBLIC_ENDPOINTS or is_admin():
-        return None
-    # MSG: Message shown when a non-admin tries to open a host-only history page
-    flash(_("You don't have permission to view this page"), "is-danger")
-    return redirect(url_for("home.home"))
-
-
 def _filter_sessions() -> list[dict]:
     """The sessions the filter dropdowns offer, newest first."""
     return get_karaoke_instance().play_history.get_sessions(limit=_FILTER_SESSIONS)
@@ -75,7 +60,8 @@ def sessions():
     return render_template(
         "sessions.html",
         site_title=get_site_name(),
-        title="Sessions",
+        # MSG: Title of the session management page.
+        title=_("Sessions"),
         page_size=SESSIONS_PAGE_SIZE,
         # The API rejects anything longer, so the page enforces the same cap
         # rather than letting the host type a name that is refused on submit.
@@ -84,13 +70,15 @@ def sessions():
 
 
 @sessions_bp.route("/history")
+@public
 @sessions_bp.arguments(HistoryQuery, location="query")
 def history(query):
     """The play log, showing every session or one, for anyone in the room."""
     return render_template(
         "history.html",
         site_title=get_site_name(),
-        title="Play History",
+        # MSG: Title of the page logging everything that has been sung.
+        title=_("Play History"),
         page_size=PLAYS_PAGE_SIZE,
         # Deleting an entry is a host action; queuing a song back up is not.
         admin=is_admin(),
@@ -103,6 +91,7 @@ def history(query):
 
 
 @sessions_bp.route("/rankings")
+@public
 @sessions_bp.arguments(RankingsQuery, location="query")
 def rankings(query):
     """Most-played songs and most active performers, all time or by session."""
@@ -111,7 +100,8 @@ def rankings(query):
     return render_template(
         "rankings.html",
         site_title=get_site_name(),
-        title="Rankings",
+        # MSG: Title of the most-played songs and most active singers page.
+        title=_("Rankings"),
         top_songs=k.play_history.get_top_songs(query["songs"], session_uuid),
         top_performers=k.play_history.get_singers(
             session_uuid, limit=query["performers"], completed_only=True

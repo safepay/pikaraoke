@@ -240,6 +240,9 @@
 		window.socket.emit("request_mic_settings");
 		{% endif %}
 
+		{# Everything below is host-only, and the elements it writes to only
+		   render for the host: a guest would collect two 403s and no page. #}
+		{% if admin %}
 		// Fetch system stats asynchronously
 			$.getJSON("{{ url_for('info.get_system_stats') }}", function(data) {
 				if (data.error) {
@@ -299,17 +302,9 @@
 				});
 				showNotification({{ _('Library sync complete') | tojson }}, "is-success");
 			});
+		{% endif %}
 		});
 	</script>
-{% endblock %}
-
-{% block header %}
-	<h1>
-		{% block title %}
-			{# MSG: Title of the information page. #}
-			{% trans %}Information{% endtrans %}
-		{% endblock %}
-	</h1>
 {% endblock %}
 
 {% block content %}
@@ -331,9 +326,9 @@
 		</div>
 	</div>
 
-	{% if not admin and admin_password != none %}
+	{% if not admin and admin_password_set %}
 		{# MSG: Title of the admin section. #}
-		<h1>{% trans %}Admin{% endtrans %}</h1>
+		<h2>{% trans %}Admin{% endtrans %}</h2>
 
 		<div class="card">
 			<div class="card-content">
@@ -341,10 +336,9 @@
 					{# MSG: Title fo the form to enter the administrator password. #}
 					<p>{% trans %}Enter the administrator password{% endtrans %}</p>
 					<form action="{{ url_for('admin.auth') }}" method="post">
-						<input type="hidden" name="next" value="{{ request.path }}" />
 						<div class="field has-addons mb-2">
 							<div class="control" style="width: 100%; max-width: 350px">
-								<input type="password" name="admin_password" class="input" />
+								<input type="password" name="admin_password" class="input" autocomplete="current-password" />
 							</div>
 							<div class="control">
 								{# MSG: Text on submit button for the admin login form. #}
@@ -352,6 +346,8 @@
 							</div>
 						</div>
 					</form>
+					{# MSG: Tells a locked-out host how to reset a forgotten admin password. #}
+					<p class="is-size-7 has-text-grey">{% trans %}Forgotten it? Restart PiKaraoke with --admin-password to set a new one.{% endtrans %}</p>
 				</div>
 			</div>
 		</div>
@@ -360,7 +356,7 @@
 	{% if admin %}
 
 		{# MSG: Title of the song library section. #}
-		<h1>{% trans %}Song Library{% endtrans %}</h1>
+		<h2>{% trans %}Song Library{% endtrans %}</h2>
 
 		<div class="card">
 			<header class="card-header py-3 px-5 collapsible-header is-collapsed">
@@ -446,13 +442,13 @@
 		</div>
 
 		{# MSG: Title of the user preferences section. #}
-		<h1>{% trans %}User Preferences{% endtrans %}</h1>
+		<h2>{% trans %}User Preferences{% endtrans %}</h2>
 
 		<div class="card">
 			<header class="card-header py-3 px-5 collapsible-header is-collapsed">
 				<div class="media-content">
 					{# MSG: Title text for the splash screen settings section of preferences #}
-					<h3 class="title mb-0">{% trans %}Splash screen settings{% endtrans %}</h3>
+					<h3 class="mb-0">{% trans %}Splash screen settings{% endtrans %}</h3>
 
 				</div>
 			</header>
@@ -544,7 +540,7 @@
 
 			<header class="card-header py-3 px-5 collapsible-header is-collapsed">
 				<div class="media-content">
-					<h3 class="title mb-0">{% trans %}Audio{% endtrans %}</h3>
+					<h3 class="mb-0">{% trans %}Audio{% endtrans %}</h3>
 				</div>
 			</header>
 			<div class="card-content collapsible-content">
@@ -596,7 +592,7 @@
 			<header class="card-header py-3 px-5 collapsible-header is-collapsed">
 				<div class="media-content">
 				{# MSG: Title text for the Score Phrases section of preferences #}
-				<h3 class="title m-0">{% trans %}Score phrases{% endtrans %}</h3>
+				<h3 class="m-0">{% trans %}Score phrases{% endtrans %}</h3>
 
 			</div>
 		</header>
@@ -756,7 +752,7 @@
 		</div>
 
 		{# MSG: Title of the system data section. #}
-		<h1>{% trans %}System Data{% endtrans %}</h1>
+		<h2>{% trans %}System Data{% endtrans %}</h2>
 
 		<div class="card">
 			<header class="card-header py-3 px-5">
@@ -798,12 +794,12 @@
 		</div>
 
 		{# MSG: Title of the updates section. #}
-		<h1>{% trans %}Updates{% endtrans %}</h1>
+		<h2>{% trans %}Updates{% endtrans %}</h2>
 
 		<div class="card">
 			<header class="card-header py-3 px-5 collapsible-header is-collapsed">
 				{# MSG: Label for the YT-DLP update on the updates section #}
-				<h3 class="title mb-0">{% trans %}YT-DLP update{% endtrans %}</h3>
+				<h3 class="mb-0">{% trans %}YT-DLP update{% endtrans %}</h3>
 			</header>
 			<div class="card-content collapsible-content">
 				<div class="content">
@@ -831,12 +827,12 @@
 		{% if is_pi and not is_container %}
 
 			{# MSG: Title of the updates section. #}
-			<h1>{% trans %}Other{% endtrans %}</h1>
+			<h2>{% trans %}Other{% endtrans %}</h2>
 
 			<div class="card">
 				<header class="card-header py-3 px-5 collapsible-header is-collapsed">
 					{# MSG: Title for section containing a few other options on the Info page. #}
-					<h3 class="title mb-0">{% trans %}Expand Raspberry Pi filesystem{% endtrans %}</h3>
+					<h3 class="mb-0">{% trans %}Expand Raspberry Pi filesystem{% endtrans %}</h3>
 				</header>
 				<div class="card-content collapsible-content">
 					<div class="content">
@@ -855,24 +851,49 @@
 
 		{% endif %}
 
-		{% if admin_password != none %}
-			{# MSG: Title of the admin section. #}
-			<h1>{% trans %}Admin{% endtrans %}</h1>
+		{# MSG: Title of the admin section. #}
+		<h2>{% trans %}Admin{% endtrans %}</h2>
 
-			<div class="card">
-				<div class="card-content">
-					<div class="content">
-						{# MSG: Message for the log out user from admin mode button. #}
-						<p>{% trans %}Click here to logout from admin mode.{% endtrans %}</p>
-						{# MSG: Link which will log out the user from admin mode. #}
-						<a class="button is-primary" href="{{ url_for('admin.logout') }}">{% trans %}Log out{% endtrans %}</a>
-					</div>
+		<div class="card">
+			<div class="card-content">
+				<div class="content">
+					{% if admin_password_set %}
+						{# MSG: Explains the admin password field when a password is already set. #}
+						<p>{% trans %}Change the administrator password. Every other device will need to log in again.{% endtrans %}</p>
+					{% else %}
+						{# MSG: Explains the admin password field when no password has been set. #}
+						<p>{% trans %}Everyone on the network is an admin. Set a password to keep the player controls, song editing and shutdown to yourself.{% endtrans %}</p>
+					{% endif %}
+					<form action="{{ url_for('admin.set_admin_password') }}" method="post">
+						<div class="field has-addons mb-2">
+							<div class="control" style="width: 100%; max-width: 350px">
+								<input type="password" name="admin_password" class="input" autocomplete="new-password" />
+							</div>
+							<div class="control">
+								{# MSG: Button which saves a new administrator password. #}
+								<button class="button is-rounded is-primary">{% trans %}Save password{% endtrans %}</button>
+							</div>
+						</div>
+					</form>
+					{% if admin_password_set %}
+						<div class="buttons">
+							<form action="{{ url_for('admin.set_admin_password') }}" method="post">
+								<input type="hidden" name="admin_password" value="" />
+								{# MSG: Button which removes the administrator password, making everyone an admin. #}
+								<button class="button is-danger is-outlined">{% trans %}Clear password{% endtrans %}</button>
+							</form>
+							<form action="{{ url_for('admin.logout') }}" method="post">
+								{# MSG: Button which logs the user out of admin mode. #}
+								<button class="button is-primary">{% trans %}Log out{% endtrans %}</button>
+							</form>
+						</div>
+					{% endif %}
 				</div>
 			</div>
-		{% endif %}
+		</div>
 
 		{# MSG: Title of the section on shutting down / turning off the machine running Pikaraoke. #}
-		<h1>{% trans %}Shutdown{% endtrans %}</h1>
+		<h2>{% trans %}Shutdown{% endtrans %}</h2>
 
 		<div class="card">
 			<div class="card-content">
