@@ -11,6 +11,7 @@ if not hasattr(werkzeug, "__version__"):
 
 from pikaraoke.karaoke import SongInUseError
 from pikaraoke.lib.metadata_parser import sanitize_filename
+from pikaraoke.lib.song_manager import SongManager
 from pikaraoke.routes.batch_song_renamer import _names_match, batch_song_renamer_bp
 from tests.conftest import make_route_app
 
@@ -155,9 +156,7 @@ class TestNameOrderPreference:
         ("preference", "artist_first"),
         [("artist_title", True), ("title_artist", False)],
     )
-    def test_the_preference_reaches_the_suggestion(self, app, client, preference, artist_first):
-        # app.py binds this global for real; the row template calls it.
-        app.jinja_env.globals["filename_from_path"] = lambda path: Path(path).stem
+    def test_the_preference_reaches_the_suggestion(self, client, preference, artist_first):
         k = MagicMock()
         k.song_manager.songs = ["/songs/Song - Artist.mp4"]
         k.song_manager.filename_from_path.return_value = "Song - Artist"
@@ -174,3 +173,20 @@ class TestNameOrderPreference:
 
         assert response.status_code == 200
         assert mock_correct.call_args.kwargs["artist_first"] is artist_first
+
+    def test_a_noisy_filename_is_listed_for_rename(self, client):
+        """The comparison sees the filename, not the tidied display name."""
+        path = "/songs/ABBA - Waterloo - Karaoke Version from Zoom Karaoke---dQw4w9WgXcQ.mp4"
+        k = MagicMock()
+        k.song_manager.songs = [path]
+        k.song_manager.filename_from_path.side_effect = SongManager.filename_from_path
+        k.preferences.get_or_default.return_value = "artist_title"
+
+        with (
+            patch("pikaraoke.routes.batch_song_renamer.get_karaoke_instance", return_value=k),
+            patch("pikaraoke.lib.metadata_parser._lastfm_track_search", return_value=[]),
+        ):
+            html = client.get("/batch-song-renamer/get-songs-to-rename").get_json()["html"]
+
+        assert "ABBA - Waterloo - Karaoke Version from Zoom Karaoke" in html
+        assert 'value="ABBA - Waterloo"' in html

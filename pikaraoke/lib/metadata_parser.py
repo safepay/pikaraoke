@@ -672,7 +672,10 @@ def lookup_lastfm(song: str, artist_first: bool = True) -> str | None:
     if key in _song_name_cache:
         return _song_name_cache[key]
 
-    cleaned_query = clean_search_query(song)
+    # regex_tidy first: clean_search_query alone leaves vendor noise like
+    # "from Zoom Karaoke" in the query. suggest_metadata splits the two the
+    # same way -- tidy to search with, untidied to compare against.
+    cleaned_query = clean_search_query(regex_tidy(song))
     results = _lastfm_track_search(cleaned_query)
 
     if not isinstance(results, list):
