@@ -851,15 +851,27 @@ class TestSearchLastfmTracks:
         assert params["limit"] == "3"
 
 
-class TestProvenanceRouting:
-    """Tests for get_song_correct_name provenance-based routing."""
+class TestGetSongCorrectName:
+    """Every song is looked up; provenance decides only the fallback."""
 
     @patch("pikaraoke.lib.metadata_parser.lookup_lastfm")
-    def test_youtube_file_with_separator_skips_lastfm(self, mock_lookup):
+    def test_a_youtube_file_with_a_separator_is_still_looked_up(self, mock_lookup):
+        """The filename's own order is not evidence of which half is the artist."""
+        mock_lookup.return_value = "Artist - Song Title"
         result = get_song_correct_name(
-            "Artist - Song Title", raw_filename="/songs/Artist - Song Title---dQw4w9WgXcQ.mp4"
+            "Song Title - Artist", raw_filename="/songs/Song Title - Artist---dQw4w9WgXcQ.mp4"
         )
-        mock_lookup.assert_not_called()
+        mock_lookup.assert_called_once_with("Song Title - Artist", artist_first=True)
+        assert result == "Artist - Song Title"
+
+    @patch("pikaraoke.lib.metadata_parser.lookup_lastfm")
+    def test_a_failed_lookup_falls_back_to_the_tidied_name(self, mock_lookup):
+        """A lookup that finds nothing costs the ordering, not the suggestion."""
+        mock_lookup.return_value = None
+        result = get_song_correct_name(
+            "Artist - Song Title (Karaoke Version)",
+            raw_filename="/songs/Artist - Song Title---dQw4w9WgXcQ.mp4",
+        )
         assert result == "Artist - Song Title"
 
     @patch("pikaraoke.lib.metadata_parser.lookup_lastfm")
@@ -870,6 +882,13 @@ class TestProvenanceRouting:
         )
         mock_lookup.assert_called_once_with("Sweet Caroline", artist_first=True)
         assert result == "Sweet Caroline - Neil Diamond"
+
+    @patch("pikaraoke.lib.metadata_parser.lookup_lastfm")
+    def test_a_non_youtube_file_has_no_tidy_fallback(self, mock_lookup):
+        """Only YouTube filenames carry the noise regex_tidy exists to strip."""
+        mock_lookup.return_value = None
+        result = get_song_correct_name("Artist - Song", raw_filename="/songs/Artist - Song.mp4")
+        assert result is None
 
     @patch("pikaraoke.lib.metadata_parser.lookup_lastfm")
     def test_non_youtube_file_always_uses_lastfm(self, mock_lookup):
@@ -885,9 +904,9 @@ class TestProvenanceRouting:
         mock_lookup.assert_called_once_with("Artist - Song", artist_first=True)
 
     @patch("pikaraoke.lib.metadata_parser.lookup_lastfm")
-    def test_youtube_bracket_format_with_separator(self, mock_lookup):
+    def test_youtube_bracket_format_falls_back_too(self, mock_lookup):
+        mock_lookup.return_value = None
         result = get_song_correct_name(
             "Artist - Song", raw_filename="/songs/Artist - Song [dQw4w9WgXcQ].mp4"
         )
-        mock_lookup.assert_not_called()
         assert result == "Artist - Song"

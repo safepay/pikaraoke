@@ -840,16 +840,19 @@ def search_lastfm_tracks(query: str, limit: int | None = None) -> list[dict]:
 def get_song_correct_name(
     song: str, raw_filename: str | None = None, artist_first: bool = True
 ) -> str | None:
-    """Get the best corrected name for a song, using provenance-based routing.
+    """Get the best corrected name for a song, joined in the requested order.
 
-    A YouTube-sourced file whose tidied name already reads "Artist - Title"
-    costs no API call, and keeps the order it has: regex_tidy is subtractive,
-    so nothing in that name says which half is the artist. Everything else
-    goes to Last.fm, and artist_first orders what comes back.
+    Every song is looked up, because only a resolved artist says which half of
+    a name is which. regex_tidy still supplies the fallback for a YouTube-sourced
+    file, so a lookup that finds nothing costs the ordering, not the suggestion.
     """
+    resolved = lookup_lastfm(song, artist_first=artist_first)
+    if resolved:
+        return resolved
+
     if raw_filename and has_youtube_id(raw_filename):
         tidied = regex_tidy(song)
         if has_artist_title_separator(tidied):
             return tidied
 
-    return lookup_lastfm(song, artist_first=artist_first)
+    return None
