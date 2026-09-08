@@ -40,13 +40,13 @@ tests/
 
 ## Architecture
 
-**SQLite database.** `pikaraoke.db` lives in the platform data directory. `KaraokeDatabase` is the pure data layer: `songs` (file_path, youtube_id, format, then artist/title/variant/year/genre and `metadata_status`), a `metadata` key/value table, and `sessions`/`plays` behind play history. WAL mode, schema version 1 in `PRAGMA user_version`. `LibraryScanner` syncs filesystem to DB, diffing against DB paths and detecting moves by basename. A circuit breaker (`CIRCUIT_BREAKER_THRESHOLD = 0.5`) prevents mass deletion when a song drive is unmounted. Cold start scans fully before the UI is ready; otherwise it loads instantly and syncs in the background.
+**SQLite database.** `pikaraoke.db` lives in the platform data directory. `_SCHEMA` at the top of `lib/karaoke_database.py` is the authority on tables and columns; `KaraokeDatabase` is the pure data layer over it. WAL mode, schema version in `PRAGMA user_version`. `LibraryScanner` syncs filesystem to DB, diffing against DB paths and detecting moves by basename. A circuit breaker (`CIRCUIT_BREAKER_THRESHOLD = 0.5`) prevents mass deletion when a song drive is unmounted. Cold start scans fully before the UI is ready; otherwise it loads instantly and syncs in the background.
 
 **Manager pattern.** Managers take explicit dependencies (PreferenceManager, EventSystem, KaraokeDatabase), never the Karaoke instance. Karaoke wires them together and subscribes to events.
 
 **Events.** Components emit; Karaoke subscribes and broadcasts to the UI via SocketIO. See `karaoke.py` for subscriptions, `events.py` for the dispatcher.
 
-**Route blueprints.** `flask_smorest.Blueprint`, never `flask.Blueprint`. `app.py` holds both lists: `_api_blueprints` register on `api` and show in `/apidocs`, `_internal_blueprints` on `app` and do not. `routes/__init__.py` is empty. Membership is readership, not medium - an internal blueprint may still carry an `/api/` route. Validate with `@bp.arguments(Schema, location="query")`; the route receives a `params` dict. HTML form fields are snake_case. Routes delegate to managers - no business logic.
+**Route blueprints.** `flask_smorest.Blueprint`, never `flask.Blueprint`. `app.py` holds both lists: `_api_blueprints` register on `api` and show in `/apidocs`, `_internal_blueprints` on `app` and do not. Membership is readership, not medium - an internal blueprint may still carry an `/api/` route. Validate with `@bp.arguments(Schema, location="query")`; the route receives a `params` dict. HTML form fields are snake_case. Routes delegate to managers - no business logic.
 
 **A route's medium is its path.** Every route answering JSON sits under `/api`, and no page does. The auth gate reads nothing else to choose between a JSON 403 and a redirect, so putting a JSON route outside `/api` hands a guest HTML where the caller reads JSON. Nothing tests this - it holds by review only. `install_auth_gate(app)` runs in `app.py` after registration, so every endpoint it reads exists; `@public` from `lib/auth.py` opens a route to the room, below its `@route`, and anything unmarked is host-only.
 
