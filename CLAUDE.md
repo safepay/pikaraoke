@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Guidance for Claude Code when working on PiKaraoke.
+Guidance for Claude Code when working on PiKaraoke. The [development guide](https://github.com/vicwomg/pikaraoke/wiki/Pikaraoke-development-guide) is the source of truth for scope, style, comments, commits, and PR and issue conventions. Follow it; do not restate it here. This file carries only what it leaves out.
 
 ## Project Overview
 
@@ -59,11 +59,15 @@ Only support these two patterns.
 - pytest with mocked external I/O and subprocess operations only
 - Test business logic and integration points
 - Skip trivial getters/setters
+- Skip the test entirely when a fix is self-evident and cannot silently regress - a multi-case test file is disproportionate to a one-line correction
 - Use real `EventSystem` and `PreferenceManager` instances (they're lightweight)
 
 ## Code Quality
 
 ```bash
+# Run the test suite
+uv run pytest
+
 # Run pre-commit checks
 uv run pre-commit run --config code_quality/.pre-commit-config.yaml --all-files
 ```
@@ -71,10 +75,6 @@ uv run pre-commit run --config code_quality/.pre-commit-config.yaml --all-files
 Tools: Black (100 char), isort, pycln, pylint, mdformat.
 
 Never commit to `master` directly.
-
-## Pull Requests
-
-PRs must include a test plan: a minimal checklist targeting only the changes made, enabling quick manual verification.
 
 ## What NOT to Do
 
