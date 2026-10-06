@@ -85,6 +85,7 @@ def info():
         complete_transcode_before_play=k.complete_transcode_before_play,
         avsync=k.avsync,
         limit_user_songs_by=k.limit_user_songs_by,
+        autoplay=k.autoplay,
         enable_fair_queue=k.enable_fair_queue,
         buffer_size=k.buffer_size,
         languages=LANGUAGES,
