@@ -692,6 +692,11 @@
 				<div class="content">
 
 					<div class="user-preference-container">
+					<input id="pref-autoplay" type="checkbox" class="user-preference-checkbox checkbox" data-pref="autoplay" {% if autoplay == True %}checked{% endif %}>
+					<label class="label" for="pref-autoplay">{# MSG: Checkbox label for playing the next queued song automatically #} {% trans %}Autoplay{% endtrans %}</label>
+					</div>
+
+					<div class="user-preference-container">
 						<input id="pref-normalize" type="checkbox" class="user-preference-checkbox checkbox" data-pref="normalize_audio" {% if normalize_audio == True %}checked{% endif %}>
 						<label class="label" for="pref-normalize">{# MSG: Checkbox label which enable/disables audio volume normalization #} {% trans %}Normalize audio volume{% endtrans %}
 						</label>
