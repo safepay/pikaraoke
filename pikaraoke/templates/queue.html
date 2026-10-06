@@ -390,7 +390,7 @@
     html += '</div></td>';
 
     if (isAdmin) {
-      html += '<td style="vertical-align: middle; text-align: right; padding-right: 10px; white-space: nowrap;">';
+      html += '<td style="width: ' + COL_WIDTH.options + '; vertical-align: middle; text-align: right; padding-right: 10px; white-space: nowrap;">';
       // With autoplay off, the head song waits for a manual start.
       var np = window.queuePageState.nowPlaying;
       if (index === 0 && np && !np.now_playing && np.autoplay === false) {
