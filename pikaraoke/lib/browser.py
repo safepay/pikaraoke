@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import socket
 import subprocess
 import time
 import webbrowser
@@ -50,8 +51,6 @@ class Browser:
         on Windows, Linux, and macOS.
         """
         logging.debug(f"Launching splash screen: {self.splash_url}")
-
-        ozone_platform = self._configure_ssh_display()
 
         suppress_logs = int(self.karaoke.log_level) > logging.DEBUG
         stdout_dest = subprocess.DEVNULL if suppress_logs else None
@@ -106,6 +105,10 @@ class Browser:
         if browser_executable:
             cmd = [browser_executable]
 
+            # Only resolve the display now that a kiosk browser will actually launch,
+            # so the fallback path below neither logs nor overrides the environment.
+            env_overrides, ozone_platform = self._configure_ssh_display()
+
             # Use a persistent profile on desktop platforms to ensure flags are respected
             # even if Chrome is already open and to preserve cookies (user name).
             # Skip on Pi (dedicated kiosk device uses default profile).
@@ -154,8 +157,11 @@ class Browser:
                 cmd.append(self.splash_url)
 
             logging.debug(f"Browser command: {' '.join(cmd)}")
+            browser_env = {**os.environ, **env_overrides} if env_overrides else None
             try:
-                self.browser_process = subprocess.Popen(cmd, stdout=stdout_dest, stderr=stderr_dest)
+                self.browser_process = subprocess.Popen(
+                    cmd, stdout=stdout_dest, stderr=stderr_dest, env=browser_env
+                )
             except OSError as e:
                 logging.error(f"Failed to launch browser subprocess: {e}")
         else:
@@ -166,53 +172,91 @@ class Browser:
             except webbrowser.Error as e:
                 logging.error(f"Error opening system browser: {e}")
 
-    def _configure_ssh_display(self) -> str | None:
+    def _configure_ssh_display(self) -> tuple[dict[str, str] | None, str | None]:
         """Point the splash at the local screen when started over SSH.
 
-        An SSH shell inherits no DISPLAY or WAYLAND_DISPLAY, so the browser
-        can't find the device's screen. Prefer the Wayland session (the
-        Raspberry Pi OS default) when its socket is present: forcing X11 there
-        routes video through XWayland, whose hardware overlay renders magenta.
-        Fall back to the primary X display otherwise. Returns the Chromium
-        `--ozone-platform` to use, or None to inherit the session's own.
+        An SSH shell inherits no DISPLAY/WAYLAND_DISPLAY, and `ssh -X` forwards
+        DISPLAY back to the client machine instead of the device's own screen;
+        in both cases the kiosk browser must be redirected to the attached
+        display. Prefer the Wayland session (the Raspberry Pi OS default) when a
+        live socket is present: forcing X11 there routes video through XWayland,
+        whose hardware overlay renders magenta. Fall back to the primary X
+        display otherwise.
+
+        Returns (env_overrides, ozone_platform): environment variables to apply
+        to the browser subprocess only (or None to inherit the session's), and
+        the Chromium `--ozone-platform` to force (or None). The environment is
+        never mutated process-wide.
         """
         if not is_linux():
-            return None
-        if os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"):
-            return None
+            return None, None
+        if os.environ.get("WAYLAND_DISPLAY"):
+            return None, None
+        display = os.environ.get("DISPLAY")
+        if display and not self._is_forwarded_display(display):
+            return None, None
 
         runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
         if not runtime_dir:
             runtime_dir = f"/run/user/{os.getuid()}"  # pylint: disable=no-member
         wayland_socket = self._find_wayland_socket(runtime_dir)
         if wayland_socket:
+            if self.external_monitor:
+                logging.warning(
+                    "--external-monitor has no effect under Wayland; the splash "
+                    "will open on the compositor's primary output."
+                )
             logging.info(
-                "No display set (launched over SSH?); routing the splash through "
+                "No local display (launched over SSH?); routing the splash through "
                 f"Wayland ({wayland_socket}) to keep hardware video decode. "
                 "Pass --headless to run without it."
             )
-            os.environ["XDG_RUNTIME_DIR"] = runtime_dir
-            os.environ["WAYLAND_DISPLAY"] = wayland_socket
-            return "wayland"
+            return {"XDG_RUNTIME_DIR": runtime_dir, "WAYLAND_DISPLAY": wayland_socket}, "wayland"
 
         logging.info(
-            "No display set (launched over SSH?); defaulting "
+            "No local display (launched over SSH?); defaulting "
             f"DISPLAY={DEFAULT_DISPLAY} so the splash opens on the attached screen. "
             "Pass --headless to run without it."
         )
-        os.environ["DISPLAY"] = DEFAULT_DISPLAY
-        return None
+        return {"DISPLAY": DEFAULT_DISPLAY}, None
+
+    @staticmethod
+    def _is_forwarded_display(display: str) -> bool:
+        """True for an `ssh -X` display like 'localhost:10.0' (a host before the colon).
+
+        A local display such as ':0' has an empty host and is used as-is.
+        """
+        host, _, _ = display.partition(":")
+        return host != ""
 
     def _find_wayland_socket(self, runtime_dir: str) -> str | None:
-        """Return the name of a Wayland socket in runtime_dir, if one exists."""
+        """Return the name of a live Wayland socket in runtime_dir, if one exists.
+
+        A stale socket file can linger after the compositor exits (or when the
+        session is X11), so each candidate is probed and only one a compositor
+        is actually accepting connections on is returned.
+        """
         try:
             entries = sorted(os.listdir(runtime_dir))
         except OSError:
             return None
-        return next(
-            (e for e in entries if e.startswith("wayland-") and not e.endswith(".lock")),
-            None,
-        )
+        for entry in entries:
+            if not entry.startswith("wayland-") or entry.endswith(".lock"):
+                continue
+            if self._wayland_socket_is_live(os.path.join(runtime_dir, entry)):
+                return entry
+        return None
+
+    @staticmethod
+    def _wayland_socket_is_live(path: str) -> bool:
+        """True if a Wayland compositor is accepting connections on the socket."""
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+                sock.settimeout(0.5)
+                sock.connect(path)
+            return True
+        except OSError:
+            return False
 
     def close(self):
         """Close the browser process and all child processes."""
