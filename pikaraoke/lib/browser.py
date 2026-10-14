@@ -17,6 +17,8 @@ from pikaraoke.lib.get_platform import (
     is_windows,
 )
 
+DEFAULT_DISPLAY = ":0"
+
 if TYPE_CHECKING:
     from pikaraoke.karaoke import Karaoke
 
@@ -48,6 +50,8 @@ class Browser:
         on Windows, Linux, and macOS.
         """
         logging.debug(f"Launching splash screen: {self.splash_url}")
+
+        self._default_display_for_ssh()
 
         suppress_logs = int(self.karaoke.log_level) > logging.DEBUG
         stdout_dest = subprocess.DEVNULL if suppress_logs else None
@@ -158,6 +162,19 @@ class Browser:
                 webbrowser.open(self.splash_url, new=1, autoraise=True)
             except webbrowser.Error as e:
                 logging.error(f"Error opening system browser: {e}")
+
+    def _default_display_for_ssh(self) -> None:
+        """Target the local screen over SSH, where no DISPLAY is inherited."""
+        if not is_linux():
+            return
+        if os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"):
+            return
+        logging.info(
+            "No display detected (launched over SSH?); defaulting "
+            f"DISPLAY={DEFAULT_DISPLAY} so the splash screen opens on the attached "
+            "screen. Pass --headless to run without it."
+        )
+        os.environ["DISPLAY"] = DEFAULT_DISPLAY
 
     def close(self):
         """Close the browser process and all child processes."""
