@@ -51,7 +51,7 @@ class Browser:
         """
         logging.debug(f"Launching splash screen: {self.splash_url}")
 
-        self._default_display_for_ssh()
+        ozone_platform = self._configure_ssh_display()
 
         suppress_logs = int(self.karaoke.log_level) > logging.DEBUG
         stdout_dest = subprocess.DEVNULL if suppress_logs else None
@@ -137,6 +137,9 @@ class Browser:
                 ]
             )
 
+            if ozone_platform:
+                cmd.append(f"--ozone-platform={ozone_platform}")
+
             if self.external_monitor:
                 cmd.append("--window-position=2000,0")
             else:
@@ -163,18 +166,53 @@ class Browser:
             except webbrowser.Error as e:
                 logging.error(f"Error opening system browser: {e}")
 
-    def _default_display_for_ssh(self) -> None:
-        """Target the local screen over SSH, where no DISPLAY is inherited."""
+    def _configure_ssh_display(self) -> str | None:
+        """Point the splash at the local screen when started over SSH.
+
+        An SSH shell inherits no DISPLAY or WAYLAND_DISPLAY, so the browser
+        can't find the device's screen. Prefer the Wayland session (the
+        Raspberry Pi OS default) when its socket is present: forcing X11 there
+        routes video through XWayland, whose hardware overlay renders magenta.
+        Fall back to the primary X display otherwise. Returns the Chromium
+        `--ozone-platform` to use, or None to inherit the session's own.
+        """
         if not is_linux():
-            return
+            return None
         if os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"):
-            return
+            return None
+
+        runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
+        if not runtime_dir:
+            runtime_dir = f"/run/user/{os.getuid()}"  # pylint: disable=no-member
+        wayland_socket = self._find_wayland_socket(runtime_dir)
+        if wayland_socket:
+            logging.info(
+                "No display set (launched over SSH?); routing the splash through "
+                f"Wayland ({wayland_socket}) to keep hardware video decode. "
+                "Pass --headless to run without it."
+            )
+            os.environ["XDG_RUNTIME_DIR"] = runtime_dir
+            os.environ["WAYLAND_DISPLAY"] = wayland_socket
+            return "wayland"
+
         logging.info(
-            "No display detected (launched over SSH?); defaulting "
-            f"DISPLAY={DEFAULT_DISPLAY} so the splash screen opens on the attached "
-            "screen. Pass --headless to run without it."
+            "No display set (launched over SSH?); defaulting "
+            f"DISPLAY={DEFAULT_DISPLAY} so the splash opens on the attached screen. "
+            "Pass --headless to run without it."
         )
         os.environ["DISPLAY"] = DEFAULT_DISPLAY
+        return None
+
+    def _find_wayland_socket(self, runtime_dir: str) -> str | None:
+        """Return the name of a Wayland socket in runtime_dir, if one exists."""
+        try:
+            entries = sorted(os.listdir(runtime_dir))
+        except OSError:
+            return None
+        return next(
+            (e for e in entries if e.startswith("wayland-") and not e.endswith(".lock")),
+            None,
+        )
 
     def close(self):
         """Close the browser process and all child processes."""
