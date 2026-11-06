@@ -307,6 +307,32 @@ class TestNameLockRoutes:
         )
         assert star.get_json()["success"] is True
 
+    def test_a_too_short_password_is_refused(self, env):
+        client, sm, _ = env
+        resp = client.post("/api/singer/password", data={"name": "Dave", "password": "abc"})
+        assert resp.status_code == 400
+        assert resp.get_json()["success"] is False
+        assert not sm.is_protected("Dave")
+
+    def test_a_four_character_password_is_accepted(self, env):
+        client, sm, _ = env
+        resp = client.post("/api/singer/password", data={"name": "Dave", "password": "1234"})
+        assert resp.status_code == 200
+        assert sm.is_protected("Dave")
+
+    def test_a_too_long_password_is_refused(self, env):
+        client, sm, _ = env
+        resp = client.post("/api/singer/password", data={"name": "Dave", "password": "x" * 129})
+        assert resp.status_code == 400
+        assert not sm.is_protected("Dave")
+
+    def test_a_password_is_stored_exactly_as_typed(self, env):
+        client, sm, _ = env
+        # The trailing space is part of the secret: the padded form verifies, the bare one does not.
+        client.post("/api/singer/password", data={"name": "Dave", "password": "correct horse "})
+        assert sm.verify_password("Dave", "correct horse ") is not None
+        assert sm.verify_password("Dave", "correct horse") is None
+
     def test_a_protected_favourite_is_refused_without_a_login(self, env):
         client, sm, _ = env
         sm.set_password("Dave", "hunter2")

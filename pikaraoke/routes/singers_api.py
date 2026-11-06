@@ -7,7 +7,7 @@ from flask import jsonify, request
 from flask_smorest import Blueprint
 from marshmallow import Schema, ValidationError, fields, post_load, validate
 
-from pikaraoke.lib.auth import log_in_singer, public
+from pikaraoke.lib.auth import log_in_singer, password_rejection, public
 from pikaraoke.lib.current_app import (
     clear_singer_session,
     current_singer_id,
@@ -194,6 +194,9 @@ def set_password(form):
     if not password:
         singers.clear_password(name)
         return jsonify({"success": True, "name": name, "protected": False})
+    rejection = password_rejection(password)
+    if rejection:
+        return jsonify({"success": False, "error": rejection}), 400
     singer_id = singers.set_password(name, password)
     grant_singer_session(singer_id, singers.session_token(singer_id))
     return jsonify({"success": True, "name": name, "protected": True})
