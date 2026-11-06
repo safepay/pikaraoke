@@ -95,23 +95,39 @@
         const $pw = $('#text-prompt-password');
         const $pwError = $('#text-prompt-password-error');
 
+        // A label plus, when the field is required, a red asterisk the modal's
+        // footnote legend explains. Rebuilt each open so no star leaks between callers.
+        function setLabel(selector, text, required) {
+            const $label = $(selector).toggleClass('is-hidden', !text).empty();
+            if (!text) { return; }
+            $label.text(text);
+            if (required) { $label.append(' ').append($('<sup class="has-text-danger">*</sup>')); }
+        }
+
         $('#text-prompt-title').text(opts.title || '');
         $('#text-prompt-message').text(opts.message || '').toggleClass('is-hidden', !opts.message);
-        $('#text-prompt-label').text(opts.label || '').toggleClass('is-hidden', !opts.label);
+        setLabel('#text-prompt-label', opts.label || '', !!opts.required);
         $('#text-prompt-help').text(opts.help || '').toggleClass('is-hidden', !opts.help);
         $input.val(opts.value || '').attr('placeholder', opts.placeholder || '');
         // Null clears it, so a cap never leaks into another caller of this prompt.
         $input.attr('maxlength', opts.maxlength || null);
+        // Pair the name with the password for a password manager while the identity
+        // dialog is open; off for every other caller, so a plain prompt is not saved.
+        $input.attr('autocomplete', pw ? 'username' : 'off');
         if (opts.submitLabel) { $ok.text(opts.submitLabel); }
 
         $pwField.toggleClass('is-hidden', !pw);
-        $pw.val('');
+        // Reset the reveal each open, so a prior "shown" state cannot expose the next password.
+        $pw.val('').attr('type', 'password');
+        $pwField.find('.input-reveal i').attr('class', 'ph ph-eye');
         $pwError.addClass('is-hidden').text('');
         if (pw) {
-            $('#text-prompt-password-label').text(pw.label || '');
+            setLabel('#text-prompt-password-label', pw.label || '', !!pw.required);
             $('#text-prompt-password-help').text(pw.help || '').toggleClass('is-hidden', !pw.help);
             $pw.attr('placeholder', pw.placeholder || '').attr('autocomplete', pw.autocomplete || 'off');
         }
+        // The asterisk legend shows whenever a field on screen is starred.
+        $('#text-prompt-required-note').toggleClass('is-hidden', !(opts.required || (pw && pw.required)));
         // A left-pushed quiet action (e.g. log out), shown only when the caller
         // asks for one, with an optional leading icon; its click rejects with
         // { secondary: true } so the caller tells it apart from a plain cancel.
@@ -127,7 +143,8 @@
         function teardown() {
             $modal.removeClass('is-active');
             $pwField.addClass('is-hidden');
-            $pw.val('');
+            $('#text-prompt-required-note').addClass('is-hidden');
+            $pw.val('').attr('type', 'password');
             $ok.off('.prompt');
             $secondary.off('.prompt');
             $modal.find('.text-prompt-cancel, .modal-background').off('.prompt');
@@ -264,10 +281,13 @@
                     .done(function (resp) { out.resolve({ name: (resp && resp.name) || name, action: 'login', authed: true }); })
                     .fail(fail);
             } else if (password) {
+                // Changing an existing lock when already logged in to it; claiming otherwise.
+                const action = (status.protected && status.authenticated) ? 'change' : 'claim';
                 $.ajax({ url: cfg.passwordUrl, method: 'POST', data: { name: name, password: password } })
-                    .done(function () { out.resolve({ name: name, action: 'claim', authed: true }); })
+                    .done(function () { out.resolve({ name: name, action: action, authed: true }); })
                     .fail(fail);
-            } else if (status.required) {
+            } else if (status.required && !status.protected) {
+                // Only a name with no lock yet must set one; an owner leaving it blank keeps theirs.
                 out.reject(t.passwordNeeded);
             } else {
                 out.resolve({ name: name, action: 'plain', authed: false });
@@ -277,8 +297,8 @@
     }
 
     // Identity dialog: name plus, when the name lock calls for it, a password to
-    // claim a name or log in to one. Resolves { name, action, authed }; action is
-    // "login", "claim", or "plain" (a bare name change the caller handles).
+    // claim a name, log in to one, or change one. Resolves { name, action, authed };
+    // action is "login", "claim", "change", or "plain" (a bare name change the caller handles).
     window.promptForIdentity = function (opts) {
         opts = opts || {};
         const t = window.translations;
@@ -287,18 +307,23 @@
             status = (status && typeof status === 'object') ? status : {};
             const mustLogin = !!(status.protected && !status.authenticated);
             const mustSet = !!(status.required && !status.protected);
-            // Hidden only when the name is already this device's protected login;
-            // otherwise offered -- to log in, to claim, or as an optional upgrade.
-            const showPw = mustLogin || !status.protected;
-            const pw = showPw ? {
-                label: t.passwordLabel,
+            // The owner on their own device: the field becomes an optional "change password".
+            const isOwner = !!(status.protected && status.authenticated);
+            // Always offered now -- to log in, to claim, as an optional upgrade, or to
+            // change an existing lock. Removing a lock stays an admin act, never shown here.
+            const pw = {
+                label: isOwner ? t.passwordChangeLabel : t.passwordLabel,
                 placeholder: t.passwordPlaceholder,
-                help: mustLogin ? t.passwordLoginHelp : mustSet ? t.passwordRequiredHelp : t.passwordOptionalHelp,
+                help: mustLogin ? t.passwordLoginHelp
+                    : mustSet ? t.passwordRequiredHelp
+                    : isOwner ? t.passwordChangeHelp
+                    : t.passwordOptionalHelp,
                 required: mustLogin || mustSet,
                 autocomplete: mustLogin ? 'current-password' : 'new-password',
                 onSubmit: submitIdentity
-            } : null;
-            window.promptForText(Object.assign({}, opts, { password: pw }))
+            };
+            // The name is always required; its asterisk and the password's share one legend.
+            window.promptForText(Object.assign({}, opts, { password: pw, required: true }))
                 .done(function (res) {
                     d.resolve(typeof res === 'string'
                         ? { name: res, action: 'plain', authed: false }
@@ -400,15 +425,13 @@
                 secondaryIcon: joining ? null : 'ph-sign-out',
                 value: currentName
             }).done(function (res) {
-                if (res.action === 'login' || res.action === 'claim') {
+                if (res.action === 'login' || res.action === 'claim' || res.action === 'change') {
                     // The device is now logged in to the name; a cookie write, no move.
                     const changed = window.setIdentity(res.name);
-                    window.showNotification(
-                        res.action === 'claim'
-                            ? t.passwordSet
-                            : t.loggedIn.replace('{name}', res.name),
-                        'is-success'
-                    );
+                    const msg = res.action === 'claim' ? t.passwordSet
+                        : res.action === 'change' ? t.passwordChanged
+                        : t.loggedIn.replace('{name}', res.name);
+                    window.showNotification(msg, 'is-success');
                     if (changed && window.spaNavigation) { window.spaNavigation.rerender(); }
                 } else if (joining) {
                     // Naming an anonymous device: a plain cookie write, no move.

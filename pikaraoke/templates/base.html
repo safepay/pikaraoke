@@ -92,11 +92,11 @@
       // {# MSG: Label on the password field in the identity dialog. #}
       passwordLabel: {{ _("Password") | tojson }},
       // {# MSG: Password field hint while a name is unprotected and a password is optional. #}
-      passwordOptionalHelp: {{ _("Add a password to protect your name and unlock advanced features.") | tojson }},
+      passwordOptionalHelp: {{ _("Optional. Keeps your name and favourites yours on any device.") | tojson }},
       // {# MSG: Password field hint when logging in to a protected name. #}
       passwordLoginHelp: {{ _("This name is protected. Enter its password.") | tojson }},
       // {# MSG: Password field hint when a password must be set before the name can be used. #}
-      passwordRequiredHelp: {{ _("This name needs a password before you can use it.") | tojson }},
+      passwordRequiredHelp: {{ _("An admin requires a password before singing.") | tojson }},
       // {# MSG: Placeholder in the password field. #}
       passwordPlaceholder: {{ _("Password") | tojson }},
       // {# MSG: Toast confirming a singer protected their name with a password. #}
@@ -104,7 +104,13 @@
       // {# MSG: Toast confirming a singer logged in to their protected name. #}
       loggedIn: {{ _("Logged in as {name}") | tojson }},
       // {# MSG: Error shown in the dialog when a required password was left blank. #}
-      passwordNeeded: {{ _("A password is required.") | tojson }}
+      passwordNeeded: {{ _("Password required.") | tojson }},
+      // {# MSG: Label on the password field when a logged-in singer changes their existing password. #}
+      passwordChangeLabel: {{ _("Change password") | tojson }},
+      // {# MSG: Password field hint when a logged-in singer may change their password; leaving it blank keeps the current one. #}
+      passwordChangeHelp: {{ _("Blank keeps your current one. Changing it signs out other devices.") | tojson }},
+      // {# MSG: Toast confirming a singer changed their password. #}
+      passwordChanged: {{ _("Password changed.") | tojson }}
     };
 
     function getSemitonesLabel(value) {
@@ -204,6 +210,17 @@
     window.showNotification = function (message, categoryClass, timeout = 3000) {
       window.addToast($("#notification-stack"), message, categoryClass, { timeout });
     }
+
+    // Reusable password reveal: an `.input-reveal` icon toggles the input in its
+    // `.control` between masked and plain text. Any password field gets it from
+    // the `.control.has-icons-right` + `.input-reveal` markup alone. Delegated and
+    // namespaced so the SPA re-running this script cannot double-bind it.
+    $(document).off("click.inputReveal").on("click.inputReveal", ".input-reveal", function () {
+      var $input = $(this).closest(".control").find("input");
+      var masked = $input.attr("type") === "password";
+      $input.attr("type", masked ? "text" : "password");
+      $(this).find("i").attr("class", masked ? "ph ph-eye-slash" : "ph ph-eye");
+    });
 
     function getUserCookie() {
       return Cookies.get("user");
@@ -874,12 +891,18 @@
           {# Shown only by the identity dialog, to claim a name or log in to one. #}
           <div class="field is-hidden" id="text-prompt-password-field">
             <label class="label" id="text-prompt-password-label" for="text-prompt-password"></label>
-            <div class="control">
+            <div class="control has-icons-right">
               <input id="text-prompt-password" class="input" type="password" autocomplete="current-password">
+              {# MSG: Tooltip for the icon that shows or hides the typed password. #}
+              <span class="icon is-right input-reveal" role="button" tabindex="-1" title="{% trans %}Show or hide the password{% endtrans %}">
+                <i class="ph ph-eye"></i>
+              </span>
             </div>
             <p class="help is-hidden" id="text-prompt-password-help"></p>
             <p class="help is-danger is-hidden" id="text-prompt-password-error"></p>
           </div>
+          {# Legend for the red asterisk on required labels; shown only by the identity dialog. #}
+          <p class="help is-hidden" id="text-prompt-required-note"><span class="has-text-danger">*</span> {% trans %}Required{% endtrans %}</p>
         </section>
         <footer class="modal-card-foot is-justify-content-flex-end">
           {# Left-pushed by mr-auto. A default (dark) button with green text and icon
