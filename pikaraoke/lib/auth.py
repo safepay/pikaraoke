@@ -28,6 +28,28 @@ _LIBRARY_ENDPOINTS = frozenset({"static", "api-docs.openapi_json", "api-docs.ope
 
 _SECURITY_SCHEME = "adminSession"
 
+# No character or composition rule: the password is hashed, never rendered, and a
+# passphrase must be free to hold spaces.
+PASSWORD_MIN_LENGTH = 4
+PASSWORD_MAX_LENGTH = 128
+
+
+def password_rejection(password: str) -> str | None:
+    """Why a chosen password is too weak to set, or None when it is acceptable.
+
+    One rule for every password lock. An empty password clears the lock, so the
+    caller handles it; a set password is weighed exactly as typed, never trimmed.
+    """
+    if not password:
+        return None
+    if len(password) < PASSWORD_MIN_LENGTH:
+        # MSG: Error when a chosen password is shorter than the minimum length.
+        return _("Password must be at least %(min)d characters", min=PASSWORD_MIN_LENGTH)
+    if len(password) > PASSWORD_MAX_LENGTH:
+        # MSG: Error when a chosen password is longer than the maximum length.
+        return _("Password must be %(max)d characters or fewer", max=PASSWORD_MAX_LENGTH)
+    return None
+
 
 def public(view: Callable) -> Callable:
     """This endpoint is open to everyone in the room, to the gate and to the spec."""
