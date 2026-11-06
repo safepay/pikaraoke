@@ -133,6 +133,7 @@ class Karaoke:
         high_quality: bool | None = None,
         keep_awake: bool | None = None,
         limit_user_songs_by: int | None = None,
+        require_singer_password: bool | None = None,
         normalize_audio: bool | None = None,
         screensaver_timeout: int | None = None,
         show_splash_clock: bool | None = None,

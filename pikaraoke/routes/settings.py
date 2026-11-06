@@ -60,6 +60,7 @@ def settings():
         autoplay=k.autoplay,
         limit_user_songs_by=k.limit_user_songs_by,
         enable_fair_queue=k.enable_fair_queue,
+        require_singer_password=k.require_singer_password,
         buffer_size=k.buffer_size,
         languages=LANGUAGES,
         preferred_language=k.preferences.get("preferred_language", "en"),

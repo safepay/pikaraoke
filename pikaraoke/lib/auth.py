@@ -12,7 +12,13 @@ from flask import Flask, flash, jsonify, redirect, request, session, url_for
 from flask.typing import ResponseReturnValue
 from flask_smorest import Api
 
-from pikaraoke.lib.current_app import get_admin_auth, get_login_throttle, is_admin
+from pikaraoke.lib.current_app import (
+    get_admin_auth,
+    get_karaoke_instance,
+    get_login_throttle,
+    grant_singer_session,
+    is_admin,
+)
 
 _ = flask_babel.gettext
 
@@ -69,6 +75,30 @@ def log_in(password: str) -> LoginOutcome:
         return LoginOutcome(granted=False, retry_after=throttle.record_failure(key))
     throttle.record_success(key)
     grant_admin_session()
+    return LoginOutcome(granted=True)
+
+
+def log_in_singer(name: str, password: str) -> LoginOutcome:
+    """Log this device in as a protected singer if the password is right.
+
+    Throttled per singer, the same mechanism as the admin door, so a flood against
+    one name costs a dict lookup rather than the slow hash. A name with no lock has
+    nothing to log into and fails without touching the throttle.
+    """
+    singers = get_karaoke_instance().singer_manager
+    singer = singers.find(name)
+    if singer is None or not singers.is_protected(name):
+        return LoginOutcome(granted=False)
+    throttle = get_login_throttle()
+    key = f"singer:{singer['id']}"
+    retry_after = throttle.retry_after(key)
+    if retry_after is not None:
+        return LoginOutcome(granted=False, retry_after=retry_after)
+    singer_id = singers.verify_password(name, password)
+    if singer_id is None:
+        return LoginOutcome(granted=False, retry_after=throttle.record_failure(key))
+    throttle.record_success(key)
+    grant_singer_session(singer_id, singers.session_token(singer_id))
     return LoginOutcome(granted=True)
 
 
