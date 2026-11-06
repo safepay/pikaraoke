@@ -53,6 +53,9 @@ class LoginOutcome:
     granted: bool
     # Seconds to wait when the caller is throttled; None when it is not.
     retry_after: float | None = None
+    # The singer's canonical stored name on a granted singer login, so the device
+    # adopts "Andrew" rather than the typed "andrew" and casing is not clobbered.
+    name: str | None = None
 
     @property
     def throttled(self) -> bool:
@@ -99,7 +102,8 @@ def log_in_singer(name: str, password: str) -> LoginOutcome:
         return LoginOutcome(granted=False, retry_after=throttle.record_failure(key))
     throttle.record_success(key)
     grant_singer_session(singer_id, singers.session_token(singer_id))
-    return LoginOutcome(granted=True)
+    # The canonical casing claimed with the password, not the casing just typed.
+    return LoginOutcome(granted=True, name=singer["name"])
 
 
 def document_auth(app: Flask, api: Api) -> None:

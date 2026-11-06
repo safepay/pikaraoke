@@ -80,6 +80,10 @@ class SingerManager:
         the behaviour the old _latest_casing() subquery gave, now held in the
         row rather than re-derived on every read.
 
+        A protected name is exempt: its casing is the owner's claim, changed
+        only by their own rename, so a play under a different casing cannot
+        quietly restyle it.
+
         refresh_casing is off for a star, which is not a performance and whose
         name may come from another device's cookie.
 
@@ -87,10 +91,13 @@ class SingerManager:
         uncanonicalised name; NFC keeps case, so casing still refreshes.
         """
         name = normalize_name(name)
-        rows = self.db.query("SELECT id, name FROM singers WHERE name = ? COLLATE NOCASE", (name,))
+        rows = self.db.query(
+            "SELECT id, name, secret_hash FROM singers WHERE name = ? COLLATE NOCASE", (name,)
+        )
         if rows:
             singer_id, stored = rows[0]["id"], rows[0]["name"]
-            if refresh_casing and stored != name:
+            protected = bool(rows[0]["secret_hash"])
+            if refresh_casing and not protected and stored != name:
                 self.db.execute("UPDATE singers SET name = ? WHERE id = ?", (name, singer_id))
             return singer_id
         return self.db.execute("INSERT INTO singers (name) VALUES (?)", (name,)).lastrowid

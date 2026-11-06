@@ -91,6 +91,12 @@ class TestGetOrCreate:
         singers.get_or_create("Mike")
         assert db.query("SELECT name FROM singers WHERE id = ?", (singer_id,)) == updated_before
 
+    def test_a_protected_names_casing_does_not_refresh(self, db, singers):
+        # The owner claimed "Andrew"; a play under "andrew" must not restyle it.
+        singer_id = singers.set_password("Andrew", "hunter2")
+        singers.get_or_create("andrew")
+        assert _performer(db, singer_id) == "Andrew"
+
     def test_the_name_is_stored_normalised(self, db, singers):
         singer_id = singers.get_or_create("  Alice  ")
         assert _performer(db, singer_id) == "Alice"

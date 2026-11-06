@@ -216,7 +216,9 @@ def login_singer(form):
     """Log this device in to a protected name; the client writes the name cookie."""
     outcome = log_in_singer(form["name"], form["password"])
     if outcome.granted:
-        return jsonify({"success": True, "name": form["name"]})
+        # The canonical stored name, so a login under a different casing adopts the
+        # owner's chosen one rather than overwriting it on the next play.
+        return jsonify({"success": True, "name": outcome.name})
     if outcome.throttled:
         response = jsonify({"success": False, "error": _("Too many attempts")})
         response.status_code = 429

@@ -259,7 +259,9 @@
             if (status.protected && !status.authenticated) {
                 if (!password) { return out.reject(t.passwordNeeded); }
                 $.ajax({ url: cfg.loginUrl, method: 'POST', data: { name: name, password: password } })
-                    .done(function () { out.resolve({ name: name, action: 'login', authed: true }); })
+                    // Adopt the server's canonical name, so logging in as "andrew"
+                    // keeps the owner's stored "Andrew" rather than overwriting it.
+                    .done(function (resp) { out.resolve({ name: (resp && resp.name) || name, action: 'login', authed: true }); })
                     .fail(fail);
             } else if (password) {
                 $.ajax({ url: cfg.passwordUrl, method: 'POST', data: { name: name, password: password } })
@@ -427,17 +429,21 @@
     }
 
     /**
-     * Clear the name on this device: forget the cookie, revert the navbar to
-     * "Join in" and re-render so the server redraws the page with no singer. A
-     * local act only -- the singer's stored data is untouched and reappears when
-     * the name is typed again.
+     * Log the singer out on this device: end any server-side login, forget the
+     * name cookie, revert the navbar to "Join in" and re-render with no singer.
+     * The server session must be dropped too, or a protected name stays
+     * authenticated here and re-joining it skips the password. The singer's
+     * stored data is untouched and reappears when the name is typed (and, if
+     * protected, the password re-entered) again.
      */
     function logout() {
-        Cookies.remove('user', { path: window.pikaraokeConfig.cookiePath });
-        window.clearCurrentUser();
-        if (window.spaNavigation) {
-            window.spaNavigation.rerender();
-        }
+        $.post(window.pikaraokeConfig.logoutUrl).always(function () {
+            Cookies.remove('user', { path: window.pikaraokeConfig.cookiePath });
+            window.clearCurrentUser();
+            if (window.spaNavigation) {
+                window.spaNavigation.rerender();
+            }
+        });
     }
 
     /**
