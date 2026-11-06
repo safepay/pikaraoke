@@ -448,3 +448,64 @@ class TestRosterMergeDelete:
 
     def test_delete_of_an_unknown_name_is_a_no_op(self, singers):
         assert singers.delete_singer("Ghost") is False
+
+
+class TestNameLock:
+    def test_a_name_starts_unprotected(self, singers):
+        singers.get_or_create("Dave")
+        assert singers.is_protected("Dave") is False
+
+    def test_setting_a_password_protects_the_name(self, singers):
+        singers.set_password("Dave", "hunter2")
+        assert singers.is_protected("Dave") is True
+
+    def test_set_password_creates_the_row_on_first_use(self, singers):
+        singer_id = singers.set_password("Newcomer", "pw")
+        assert singers.find("Newcomer")["id"] == singer_id
+
+    def test_the_right_password_verifies_to_the_singer_id(self, singers):
+        singer_id = singers.set_password("Dave", "hunter2")
+        assert singers.verify_password("Dave", "hunter2") == singer_id
+
+    def test_a_wrong_password_verifies_to_none(self, singers):
+        singers.set_password("Dave", "hunter2")
+        assert singers.verify_password("Dave", "wrong") is None
+
+    def test_an_unprotected_name_verifies_to_none(self, singers):
+        singers.get_or_create("Dave")
+        assert singers.verify_password("Dave", "anything") is None
+
+    def test_clearing_a_lock_keeps_the_singer_and_their_id(self, singers):
+        singer_id = singers.set_password("Dave", "hunter2")
+        assert singers.clear_password("Dave") is True
+        assert singers.is_protected("Dave") is False
+        # Clearing the lock is not deleting the singer: the row and its id stay.
+        assert singers.find("Dave")["id"] == singer_id
+
+    def test_clearing_an_unprotected_name_is_a_no_op(self, singers):
+        singers.get_or_create("Dave")
+        assert singers.clear_password("Dave") is False
+
+    def test_session_token_is_none_until_protected(self, singers):
+        singer_id = singers.get_or_create("Dave")
+        assert singers.session_token(singer_id) is None
+
+    def test_changing_the_password_rotates_the_session_token(self, singers):
+        singer_id = singers.set_password("Dave", "first")
+        before = singers.session_token(singer_id)
+        singers.set_password("Dave", "second")
+        assert singers.session_token(singer_id) != before
+
+    def test_clearing_the_lock_drops_the_session_token(self, singers):
+        singer_id = singers.set_password("Dave", "first")
+        assert singers.session_token(singer_id) is not None
+        singers.clear_password("Dave")
+        assert singers.session_token(singer_id) is None
+
+    def test_the_roster_reports_protected_without_the_hash(self, singers):
+        singers.set_password("Dave", "hunter2")
+        singers.get_or_create("Eve")
+        roster = {row["name"]: row for row in singers.get_roster()}
+        assert roster["Dave"]["protected"] is True
+        assert roster["Eve"]["protected"] is False
+        assert "secret_hash" not in roster["Dave"]

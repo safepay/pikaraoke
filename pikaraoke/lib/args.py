@@ -400,6 +400,12 @@ def parse_pikaraoke_args() -> argparse.Namespace:
         help="Order the queue round-robin, so that singers take turns rather than the queue running first-come-first-served. Singers are ranked by the turns they have already had tonight.",
         required=False,
     )
+    queue.add_argument(
+        "--require-singer-password",
+        action="store_true",
+        help="Require every singer to set a password on their name before they can queue or favourite. Off by default, where naming yourself is open and a password is an opt-in upgrade.",
+        required=False,
+    )
 
     args = parser.parse_args()
 

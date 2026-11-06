@@ -42,8 +42,12 @@ STATE_CHANGING_ENDPOINTS = {
     "controller.vol_down",
     "singers_api.set_favourite",
     "singers_api.rename_singer",
+    "singers_api.set_password",
+    "singers_api.login_singer",
+    "singers_api.logout_singer",
     "singers_api.merge_singers",
     "singers_api.delete_singers",
+    "singers_api.clear_locks",
 }
 
 

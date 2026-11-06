@@ -31,6 +31,10 @@
       favouriteUrl: "{% if not blank_page %}{{ url_for('singers_api.set_favourite') }}{% endif %}",
       // Likewise: the splash page has no identity dialog to rename from.
       renameUrl: "{% if not blank_page %}{{ url_for('singers_api.rename_singer') }}{% endif %}",
+      // The name-lock endpoints the identity dialog drives.
+      passwordUrl: "{% if not blank_page %}{{ url_for('singers_api.set_password') }}{% endif %}",
+      loginUrl: "{% if not blank_page %}{{ url_for('singers_api.login_singer') }}{% endif %}",
+      statusUrl: "{% if not blank_page %}{{ url_for('singers_api.singer_status') }}{% endif %}",
       singerNameMaxLength: {{ singer_name_max_length }}
     };
     // Translations for JS (static JS cannot use Jinja2 directly).
@@ -83,7 +87,23 @@
       // {# MSG: Toast confirming a song was added to favourites. {title} is the song name. #}
       favouriteAdded: {{ _("Added to favourites: {title}") | tojson }},
       // {# MSG: Toast confirming a song was removed from favourites. {title} is the song name. #}
-      favouriteRemoved: {{ _("Removed from favourites: {title}") | tojson }}
+      favouriteRemoved: {{ _("Removed from favourites: {title}") | tojson }},
+      // {# MSG: Label on the password field in the identity dialog. #}
+      passwordLabel: {{ _("Password") | tojson }},
+      // {# MSG: Password field hint while a name is unprotected and a password is optional. #}
+      passwordOptionalHelp: {{ _("Add a password to protect your name and unlock advanced features.") | tojson }},
+      // {# MSG: Password field hint when logging in to a protected name. #}
+      passwordLoginHelp: {{ _("This name is protected. Enter its password.") | tojson }},
+      // {# MSG: Password field hint when a password must be set before the name can be used. #}
+      passwordRequiredHelp: {{ _("This name needs a password before you can use it.") | tojson }},
+      // {# MSG: Placeholder in the password field. #}
+      passwordPlaceholder: {{ _("Password") | tojson }},
+      // {# MSG: Toast confirming a singer protected their name with a password. #}
+      passwordSet: {{ _("Your name is now password protected.") | tojson }},
+      // {# MSG: Toast confirming a singer logged in to their protected name. #}
+      loggedIn: {{ _("Logged in as {name}") | tojson }},
+      // {# MSG: Error shown in the dialog when a required password was left blank. #}
+      passwordNeeded: {{ _("A password is required.") | tojson }}
     };
 
     function getSemitonesLabel(value) {
@@ -381,16 +401,47 @@
     // row-options modal, so the two cannot drift.
     window.enqueueSong = function (encodedPath) {
       resolveSinger().done(function (name, changed) {
-        var body = "song_to_add=" + encodedPath + "&song_added_by=" + encodeURIComponent(name);
-        $.post(window.pikaraokeConfig.enqueueUrl, body, function (data) {
-          // {# MSG: Notification shown after trying to add a song to the queue. The song name comes after this string. #}
-          showNotification(data.success[1], data.success[0] ? "is-success" : "is-danger");
-          if (changed && window.spaNavigation) {
-            window.spaNavigation.rerender();
-          }
-        });
+        postEnqueue(encodedPath, name, changed);
       });
     };
+
+    // The queue add, split out so an auth_required refusal (a protected name on a
+    // device not logged in, or enforcement with no password set) can open the
+    // identity dialog to claim or log in, then replay the same add.
+    function postEnqueue(encodedPath, name, changed) {
+      var body = "song_to_add=" + encodedPath + "&song_added_by=" + encodeURIComponent(name);
+      $.post(window.pikaraokeConfig.enqueueUrl, body, function (data) {
+        if (data.auth_required) {
+          openIdentityForName(name).done(function (resolvedName) {
+            postEnqueue(encodedPath, resolvedName, true);
+          });
+          return;
+        }
+        // {# MSG: Notification shown after trying to add a song to the queue. The song name comes after this string. #}
+        showNotification(data.success[1], data.success[0] ? "is-success" : "is-danger");
+        if (changed && window.spaNavigation) {
+          window.spaNavigation.rerender();
+        }
+      });
+    }
+
+    // Open the identity dialog to log in to or claim a name, for the auth_required
+    // retry paths. Resolves the name once the device holds it.
+    function openIdentityForName(name) {
+      var d = $.Deferred();
+      window.promptForIdentity({
+        title: window.translations.identityProfileTitle,
+        label: window.translations.usernameLabel,
+        placeholder: window.translations.usernamePlaceholder,
+        maxlength: window.pikaraokeConfig.singerNameMaxLength,
+        submitLabel: window.translations.identityProfileAction,
+        value: name
+      }).done(function (res) {
+        window.setIdentity(res.name);
+        d.resolve(res.name);
+      }).fail(function () { d.reject(); });
+      return d;
+    }
 
     // Star or unstar a song for this device's cookie singer (else the Join in
     // dialog) -- the identity its stars are drawn from, not the KJ field a queue
@@ -403,6 +454,14 @@
           "&starred=" + (makeStarred ? "true" : "false") +
           "&song_added_by=" + encodeURIComponent(name);
         $.post(window.pikaraokeConfig.favouriteUrl, body, function (data) {
+          if (data.auth_required) {
+            // A protected name not logged in here, or enforcement with no password
+            // set: log in or claim, then replay the star.
+            openIdentityForName(name).done(function () {
+              window.favouriteSong(encodedPath, makeStarred, title, onDone);
+            });
+            return;
+          }
           if (data.error) {
             // A name merged into another is retired: the server refuses and says
             // which name to take, as the queue add does.
@@ -810,6 +869,15 @@
               <input id="text-prompt-input" class="input" type="text" autocomplete="off">
             </div>
             <p class="help is-hidden" id="text-prompt-help"></p>
+          </div>
+          {# Shown only by the identity dialog, to claim a name or log in to one. #}
+          <div class="field is-hidden" id="text-prompt-password-field">
+            <label class="label" id="text-prompt-password-label" for="text-prompt-password"></label>
+            <div class="control">
+              <input id="text-prompt-password" class="input" type="password" autocomplete="current-password">
+            </div>
+            <p class="help is-hidden" id="text-prompt-password-help"></p>
+            <p class="help is-danger is-hidden" id="text-prompt-password-error"></p>
           </div>
         </section>
         <footer class="modal-card-foot is-justify-content-flex-end">

@@ -1,17 +1,37 @@
 """Singer-facing API. Favourites and self-service rename; preferences join later."""
 
+import math
+
 import flask_babel
-from flask import jsonify
+from flask import jsonify, request
 from flask_smorest import Blueprint
 from marshmallow import Schema, ValidationError, fields, post_load, validate
 
-from pikaraoke.lib.auth import public
-from pikaraoke.lib.current_app import current_singer_name, get_karaoke_instance
+from pikaraoke.lib.auth import log_in_singer, public
+from pikaraoke.lib.current_app import (
+    clear_singer_session,
+    current_singer_id,
+    current_singer_name,
+    get_karaoke_instance,
+    grant_singer_session,
+    singer_lock_barrier,
+)
 from pikaraoke.lib.singer_manager import SINGER_NAME_MAX_LENGTH, normalize_name
 
 _ = flask_babel.gettext
 
 singers_api_bp = Blueprint("singers_api", __name__)
+
+
+def _lock_refusal(barrier: str):
+    """A refusal the client turns into the password dialog, by lock-barrier reason."""
+    if barrier == "locked":
+        # MSG: Error when acting under a password-protected name without being logged in to it.
+        msg = _("This name is protected. Enter its password to continue.")
+    else:
+        # MSG: Error when a name needs a password set before it can be used (enforcement on).
+        msg = _("This name needs a password. Set one to continue.")
+    return jsonify({"success": False, "auth_required": True, "error": msg})
 
 
 class FavouriteForm(Schema):
@@ -58,6 +78,9 @@ def set_favourite(form):
         # MSG: Error when starring under a name the host merged into another. %(name)s is the surviving name.
         error = _("This name was merged into %(name)s. Set your name to continue.", name=survivor)
         return jsonify({"success": False, "error": error})
+    barrier = singer_lock_barrier(k, name)
+    if barrier:
+        return _lock_refusal(barrier)
     if form["starred"]:
         k.singer_manager.add_favourite(name, form["song"])
     else:
@@ -114,6 +137,9 @@ def rename_singer(form):
         return jsonify({"success": False, "error": _("You can only change your own name")}), 403
 
     k = get_karaoke_instance()
+    # A protected name only moves from a device logged in as it.
+    if k.singer_manager.is_protected(form["old_name"]) and singer_lock_barrier(k, form["old_name"]):
+        return _lock_refusal("locked"), 403
     outcome = k.rename_singer(form["old_name"], form["new_name"])
     if outcome == "taken":
         # MSG: Error when renaming onto a name that already belongs to someone else.
@@ -122,6 +148,107 @@ def rename_singer(form):
         # MSG: Error when renaming to or from a reserved system name.
         return jsonify({"success": False, "error": _("That name is reserved")}), 409
     return jsonify({"success": True, "name": form["new_name"], "action": outcome})
+
+
+# ----------------------------------------------------------------------
+# The name lock: a singer claims, proves and manages their own password
+# ----------------------------------------------------------------------
+
+
+def _authed_as(name: str) -> bool:
+    """Whether this device is logged in as the singer holding `name`."""
+    singer = get_karaoke_instance().singer_manager.find(name)
+    return bool(singer and current_singer_id() == singer["id"])
+
+
+class PasswordForm(Schema):
+    name = fields.String(required=True, metadata={"description": "The name to protect"})
+    # Empty clears the lock, which only the logged-in singer may do.
+    password = fields.String(
+        load_default="", metadata={"description": "New password; empty clears"}
+    )
+
+    @post_load
+    def clean(self, data, **kwargs):
+        data["name"] = _clean_singer_name(data["name"], "name")
+        return data
+
+
+@singers_api_bp.route("/api/singer/password", methods=["POST"])
+@public
+@singers_api_bp.arguments(PasswordForm, location="form")
+def set_password(form):
+    """Claim a name with a password, or change or clear an existing lock.
+
+    An unprotected name is open to claim -- setting the password is the claim.
+    Changing or clearing an existing lock needs this device logged in as it. On
+    success this device is granted (or kept in) the singer session; the client
+    writes the name cookie.
+    """
+    k = get_karaoke_instance()
+    name, password = form["name"], form["password"]
+    singers = k.singer_manager
+    if singers.is_protected(name) and not _authed_as(name):
+        # MSG: Error when changing a protected name's password without being logged in to it.
+        return jsonify({"success": False, "error": _("Log in to change this password")}), 403
+    if not password:
+        singers.clear_password(name)
+        return jsonify({"success": True, "name": name, "protected": False})
+    singer_id = singers.set_password(name, password)
+    grant_singer_session(singer_id, singers.session_token(singer_id))
+    return jsonify({"success": True, "name": name, "protected": True})
+
+
+class LoginForm(Schema):
+    name = fields.String(required=True, metadata={"description": "The protected name"})
+    password = fields.String(required=True, metadata={"description": "The name's password"})
+
+    @post_load
+    def clean(self, data, **kwargs):
+        data["name"] = normalize_name(data["name"])
+        return data
+
+
+@singers_api_bp.route("/api/singer/login", methods=["POST"])
+@public
+@singers_api_bp.arguments(LoginForm, location="form")
+def login_singer(form):
+    """Log this device in to a protected name; the client writes the name cookie."""
+    outcome = log_in_singer(form["name"], form["password"])
+    if outcome.granted:
+        return jsonify({"success": True, "name": form["name"]})
+    if outcome.throttled:
+        response = jsonify({"success": False, "error": _("Too many attempts")})
+        response.status_code = 429
+        response.headers["Retry-After"] = str(math.ceil(outcome.retry_after))
+        return response
+    # MSG: Error shown when a singer's password is wrong.
+    return jsonify({"success": False, "error": _("Incorrect password")}), 401
+
+
+@singers_api_bp.route("/api/singer/logout", methods=["POST"])
+@public
+def logout_singer():
+    """Drop this device's singer login; the name cookie is the client's to clear."""
+    clear_singer_session()
+    return jsonify({"success": True})
+
+
+@singers_api_bp.route("/api/singer/status")
+@public
+def singer_status():
+    """Report a name's lock state for the identity dialog: is it protected, is this
+    device logged in to it, and is a password required to use any name."""
+    k = get_karaoke_instance()
+    name = normalize_name(request.args.get("name") or current_singer_name() or "")
+    return jsonify(
+        {
+            "name": name,
+            "protected": bool(name) and k.singer_manager.is_protected(name),
+            "authenticated": bool(name) and _authed_as(name),
+            "required": bool(getattr(k, "require_singer_password", False)),
+        }
+    )
 
 
 # ----------------------------------------------------------------------
@@ -172,3 +299,16 @@ def delete_singers(form):
     k = get_karaoke_instance()
     deleted = sum(1 for name in form["names"] if k.singer_manager.delete_singer(name))
     return jsonify({"success": True, "deleted": deleted, "requested": len(form["names"])})
+
+
+@singers_api_bp.route("/api/singer/clear-lock", methods=["POST"])
+@singers_api_bp.arguments(DeleteForm, location="json")
+def clear_locks(form):
+    """Clear the password lock on the named singers (admin only), keeping their data.
+
+    Nulling the lock rotates session_token(), so each singer's other devices are
+    logged out; they re-protect the name with one of their own choosing.
+    """
+    k = get_karaoke_instance()
+    cleared = sum(1 for name in form["names"] if k.singer_manager.clear_password(name))
+    return jsonify({"success": True, "cleared": cleared, "requested": len(form["names"])})

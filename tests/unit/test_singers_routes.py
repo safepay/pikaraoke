@@ -41,6 +41,10 @@ def karaoke():
         # The default singer is live: a MagicMock would read as a tombstone and
         # trip the merged-name guard in every test that does not set it.
         k.singer_manager.merged_into_name.return_value = None
+        # The default name is unprotected and no password policy is on, so the
+        # lock barrier lets ordinary favourites and renames through.
+        k.singer_manager.is_protected.return_value = False
+        k.require_singer_password = False
         get_instance.return_value = k
         yield k
 
@@ -141,6 +145,15 @@ class TestDeleteSingers:
         karaoke.singer_manager.delete_singer.assert_not_called()
 
 
+class TestClearLocks:
+    def test_clears_each_named_lock_and_counts_them(self, client, karaoke):
+        karaoke.singer_manager.clear_password.side_effect = [True, False]
+        resp = client.post("/api/singer/clear-lock", json={"names": ["Dave", "Eve"]})
+        assert resp.status_code == 200
+        assert resp.get_json() == {"success": True, "cleared": 1, "requested": 2}
+        assert karaoke.singer_manager.clear_password.call_count == 2
+
+
 class TestRoster:
     def test_returns_the_roster(self, client, karaoke):
         karaoke.singer_manager.get_roster.return_value = [{"name": "Dave", "play_count": 3}]
@@ -156,6 +169,7 @@ class TestSingersPage:
         ("/api/singers", "singers_api.get_roster"),
         ("/api/singer/merge", "singers_api.merge_singers"),
         ("/api/singer/delete", "singers_api.delete_singers"),
+        ("/api/singer/clear-lock", "singers_api.clear_locks"),
     ]
 
     def test_renders_for_an_admin(self):
@@ -246,3 +260,107 @@ class TestRenameSinger:
         karaoke.rename_singer.return_value = "renamed"
         self._post(client, "Dvae", "  Dav   ey  ", cookie="Dvae")
         karaoke.rename_singer.assert_called_once_with("Dvae", "Dav ey")
+
+
+class TestNameLockRoutes:
+    """The password routes, over a real SingerManager so the crypto and session run."""
+
+    @pytest.fixture
+    def env(self, tmp_path):
+        from types import SimpleNamespace
+
+        from pikaraoke.lib.events import EventSystem
+        from pikaraoke.lib.karaoke_database import KaraokeDatabase
+        from pikaraoke.lib.login_throttle import LoginThrottle
+        from pikaraoke.lib.singer_manager import SingerManager
+        from tests.conftest import StubAdminAuth
+
+        db = KaraokeDatabase(str(tmp_path / "lock.db"))
+        sm = SingerManager(db, EventSystem(), lambda p: p)
+        k = SimpleNamespace(singer_manager=sm, require_singer_password=False)
+        app = Flask(__name__)
+        app.secret_key = "test"
+        # A password is set but no session matches it, so the caller is not admin
+        # and the lock is what decides access.
+        app.config["ADMIN_AUTH"] = StubAdminAuth(admin=False)
+        app.config["KARAOKE_INSTANCE"] = k
+        app.config["LOGIN_THROTTLE"] = LoginThrottle()
+        Babel(app)
+        app.register_blueprint(singers_api_bp)
+        app.add_url_rule("/", endpoint="home.home", view_func=public(lambda: "home"))
+        install_auth_gate(app)
+        client = app.test_client()
+        yield client, sm, k
+        db.close()
+
+    def test_setting_a_password_claims_the_name_and_logs_this_device_in(self, env):
+        client, sm, _ = env
+        resp = client.post("/api/singer/password", data={"name": "Dave", "password": "hunter2"})
+        assert resp.status_code == 200
+        assert resp.get_json()["protected"] is True
+        assert sm.is_protected("Dave")
+        # The session now authenticates this device, so a protected favourite lands.
+        client.set_cookie("user", "Dave")
+        star = client.post(
+            "/api/singer/favourite",
+            data={"song": "/s/a.mp4", "starred": "true", "song_added_by": "Dave"},
+        )
+        assert star.get_json()["success"] is True
+
+    def test_a_protected_favourite_is_refused_without_a_login(self, env):
+        client, sm, _ = env
+        sm.set_password("Dave", "hunter2")
+        client.set_cookie("user", "Dave")
+        resp = client.post(
+            "/api/singer/favourite",
+            data={"song": "/s/a.mp4", "starred": "true", "song_added_by": "Dave"},
+        )
+        body = resp.get_json()
+        assert body["success"] is False
+        assert body["auth_required"] is True
+
+    def test_login_with_the_right_password_then_the_favourite_lands(self, env):
+        client, sm, _ = env
+        sm.set_password("Dave", "hunter2")
+        ok = client.post("/api/singer/login", data={"name": "Dave", "password": "hunter2"})
+        assert ok.status_code == 200
+        client.set_cookie("user", "Dave")
+        star = client.post(
+            "/api/singer/favourite",
+            data={"song": "/s/a.mp4", "starred": "true", "song_added_by": "Dave"},
+        )
+        assert star.get_json()["success"] is True
+
+    def test_login_with_the_wrong_password_is_refused(self, env):
+        client, sm, _ = env
+        sm.set_password("Dave", "hunter2")
+        resp = client.post("/api/singer/login", data={"name": "Dave", "password": "nope"})
+        assert resp.status_code == 401
+        assert resp.get_json()["success"] is False
+
+    def test_changing_a_password_without_a_session_is_refused(self, env):
+        client, sm, _ = env
+        sm.set_password("Dave", "hunter2")
+        resp = client.post("/api/singer/password", data={"name": "Dave", "password": "new"})
+        assert resp.status_code == 403
+
+    def test_status_reports_protection_and_enforcement(self, env):
+        client, sm, k = env
+        sm.set_password("Dave", "hunter2")
+        k.require_singer_password = True
+        body = client.get("/api/singer/status", query_string={"name": "Dave"}).get_json()
+        assert body["protected"] is True
+        assert body["authenticated"] is False
+        assert body["required"] is True
+
+    def test_enforcement_blocks_an_unprotected_queue_name(self, env):
+        # Not a queue route here, but the barrier a favourite shares: enforcement on,
+        # an unprotected name is told to set a password first.
+        client, sm, k = env
+        k.require_singer_password = True
+        client.set_cookie("user", "Newbie")
+        resp = client.post(
+            "/api/singer/favourite",
+            data={"song": "/s/a.mp4", "starred": "true", "song_added_by": "Newbie"},
+        )
+        assert resp.get_json()["auth_required"] is True

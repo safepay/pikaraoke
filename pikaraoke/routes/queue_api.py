@@ -8,7 +8,11 @@ from flask_smorest import Blueprint
 from marshmallow import Schema, ValidationError, fields, post_load
 
 from pikaraoke.lib.auth import public
-from pikaraoke.lib.current_app import broadcast_event, get_karaoke_instance
+from pikaraoke.lib.current_app import (
+    broadcast_event,
+    get_karaoke_instance,
+    singer_lock_barrier,
+)
 from pikaraoke.lib.singer_manager import SINGER_NAME_MAX_LENGTH, normalize_name
 
 _ = flask_babel.gettext
@@ -162,6 +166,15 @@ def _do_enqueue(song: str, user: str) -> Response | tuple[Response, int]:
         # MSG: Error when queueing under a name the host merged into another. %(name)s is the surviving name.
         message = _("This name was merged into %(name)s. Set your name to continue.", name=survivor)
         return jsonify({"song": user, "success": [False, message]})
+    barrier = singer_lock_barrier(k, user)
+    if barrier == "locked":
+        # MSG: Error when queueing under a password-protected name without being logged in to it.
+        message = _("This name is protected. Enter its password to continue.")
+        return jsonify({"song": user, "success": [False, message], "auth_required": True})
+    if barrier == "unprotected":
+        # MSG: Error when queueing under a name that needs a password set first (enforcement on).
+        message = _("This name needs a password. Set one to continue.")
+        return jsonify({"song": user, "success": [False, message], "auth_required": True})
     rc = k.queue_manager.enqueue(song, user)
     broadcast_event("queue_update")
     song_title = k.song_manager.display_name_from_path(song)

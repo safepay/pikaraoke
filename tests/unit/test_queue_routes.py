@@ -217,6 +217,52 @@ class TestEnqueueRequiresSongInLibrary:
         mock_broadcast.assert_called_once_with("queue_update")
 
 
+class TestEnqueueNameLock:
+    """Enqueue consults the lock barrier, telling the client to claim or log in."""
+
+    def _in_library(self, mock_karaoke, song_path):
+        mock_karaoke.song_manager.songs = {song_path}
+        mock_karaoke.song_manager.display_name_from_path.return_value = "Artist - Song"
+        mock_karaoke.singer_manager.merged_into_name.return_value = None
+
+    @patch("pikaraoke.routes.queue_api.get_karaoke_instance")
+    def test_a_protected_name_not_logged_in_is_refused(
+        self, mock_get_instance, app, client, queue_env
+    ):
+        from tests.conftest import StubAdminAuth
+
+        app.config["ADMIN_AUTH"] = StubAdminAuth(admin=False)
+        song_path = "/songs/a---dQw4w9WgXcQ.mp4"
+        _qm, mock_karaoke, _qu, _np = queue_env
+        self._in_library(mock_karaoke, song_path)
+        mock_karaoke.singer_manager.is_protected.return_value = True
+        mock_karaoke.singer_manager.session_token.return_value = "tok"
+        mock_get_instance.return_value = mock_karaoke
+
+        resp = client.post("/api/enqueue", data={"song_to_add": song_path, "song_added_by": "Dave"})
+        body = resp.get_json()
+        assert body["success"][0] is False
+        assert body["auth_required"] is True
+
+    @patch("pikaraoke.routes.queue_api.get_karaoke_instance")
+    def test_enforcement_refuses_an_unprotected_name(
+        self, mock_get_instance, app, client, queue_env
+    ):
+        from tests.conftest import StubAdminAuth
+
+        app.config["ADMIN_AUTH"] = StubAdminAuth(admin=False)
+        song_path = "/songs/a---dQw4w9WgXcQ.mp4"
+        _qm, mock_karaoke, _qu, _np = queue_env
+        self._in_library(mock_karaoke, song_path)
+        mock_karaoke.require_singer_password = True
+        mock_get_instance.return_value = mock_karaoke
+
+        resp = client.post(
+            "/api/enqueue", data={"song_to_add": song_path, "song_added_by": "Newbie"}
+        )
+        assert resp.get_json()["auth_required"] is True
+
+
 class TestQueueApiContract:
     """Tests that verify the queue API returns expected data structure.
 
@@ -294,6 +340,10 @@ def queue_env(tmp_path):
     mock_karaoke = MagicMock()
     mock_karaoke.queue_manager = qm
     mock_karaoke.song_manager.display_name_from_path.return_value = "song"
+    # The ordinary path: an unprotected name, no password policy, so the lock
+    # barrier lets the add through without consulting is_admin().
+    mock_karaoke.singer_manager.is_protected.return_value = False
+    mock_karaoke.require_singer_password = False
 
     return qm, mock_karaoke, queue_updates, now_playing_updates
 

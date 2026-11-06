@@ -9,6 +9,7 @@
 	var rosterUrl = "{{ url_for('singers_api.get_roster') }}";
 	var mergeUrl = "{{ url_for('singers_api.merge_singers') }}";
 	var deleteUrl = "{{ url_for('singers_api.delete_singers') }}";
+	var clearLockUrl = "{{ url_for('singers_api.clear_locks') }}";
 
 	// Ticked names, by name (NOCASE-unique). Kept across refreshes so a play
 	// landing mid-selection does not clear it.
@@ -52,7 +53,17 @@
 		// {# MSG: Shown after a delete that removed some but kept others with plays. {deleted} and {requested} are numbers. #}
 		deletePartial: {{ _('Deleted {deleted} of {requested}. The rest still have plays -- clear their history first.') | tojson }},
 		// {# MSG: Summary in the merge dialog of which name is folded into which. {loser} and {survivor} are names. #}
-		mergeSummary: {{ _('{loser} will be merged into {survivor}') | tojson }}
+		mergeSummary: {{ _('{loser} will be merged into {survivor}') | tojson }},
+		// {# MSG: Tooltip on the lock icon beside a password-protected singer. #}
+		protectedTitle: {{ _('Password protected') | tojson }},
+		// {# MSG: Title of the dialog confirming clearing singer password locks. #}
+		clearLockTitle: {{ _('Clear password lock') | tojson }},
+		// {# MSG: Confirmation before clearing password locks. {count} is replaced with a number. #}
+		confirmClearLock: {{ _('Clear the password on {count} singer(s)? They keep their data and can set a new one.') | tojson }},
+		// {# MSG: Button confirming the clear-lock in its dialog. #}
+		clearLockAction: {{ _('Clear lock') | tojson }},
+		// {# MSG: Shown after clearing locks when none of the selected singers had one. #}
+		clearLockNone: {{ _('Nothing to clear: none of those singers had a password.') | tojson }}
 	};
 
 	function isMergeable(row) {
@@ -154,6 +165,10 @@
 			var mergedNote = isTomb
 				? ' <span class="has-text-grey-light is-size-7 ml-2">' + escapeHtml(mergedLabel) + "</span>"
 				: "";
+			var lock = s.protected
+				? ' <span class="icon is-small has-text-grey-light" title="' +
+						escapeHtml(singerText.protectedTitle) + '"><i class="ph ph-lock-key"></i></span>'
+				: "";
 			// A system name (Randomizer, Pikaraoke) is not a person: no checkbox, so
 			// it can be neither merged nor deleted, as rename already refuses it.
 			var check = s.is_system
@@ -169,7 +184,7 @@
 					'<td class="col-select">' + check + "</td>" +
 					'<td class="col-avatar">' + badge + "</td>" +
 					'<td class="col-name"><span class="singer-name' + (isTomb ? " is-italic" : "") +
-						'">' + name + "</span>" + mergedNote + "</td>" +
+						'">' + name + "</span>" + lock + mergedNote + "</td>" +
 					'<td class="col-plays has-text-right">' + s.play_count + "</td>" +
 					added +
 				"</tr>"
@@ -197,6 +212,11 @@
 		// rather than a button that is disabled for a reason the operator cannot see.
 		$("#merge-btn").prop("disabled", !(names.length === 2 && mergeable.length === 2));
 		$("#delete-btn").prop("disabled", names.length === 0);
+		// Clear-lock needs at least one protected singer in the selection.
+		var hasProtected = names.some(function (n) {
+			return rosterByName[n] && rosterByName[n].protected;
+		});
+		$("#clear-lock-btn").prop("disabled", !hasProtected);
 	}
 
 	// --- Merge chooser -------------------------------------------------------
@@ -257,6 +277,36 @@
 		}).done(function () {
 			selected = {};
 			loadRoster();
+		});
+	}
+
+	// --- Clear lock ----------------------------------------------------------
+
+	function confirmClearLock() {
+		// Only the protected ones matter; the server ignores the rest, but the
+		// count and confirmation should speak to what will actually change.
+		var names = selectedNames().filter(function (n) {
+			return rosterByName[n] && rosterByName[n].protected;
+		});
+		if (!names.length) { return; }
+		window.confirmAction({
+			title: singerText.clearLockTitle,
+			message: singerText.confirmClearLock.replace("{count}", names.length),
+			confirmLabel: singerText.clearLockAction,
+			danger: true
+		}).done(function () {
+			$.ajax({
+				url: clearLockUrl,
+				type: "POST",
+				contentType: "application/json",
+				data: JSON.stringify({ names: names })
+			}).done(function (data) {
+				selected = {};
+				loadRoster();
+				if (data.cleared === 0) {
+					showNotification(singerText.clearLockNone, "is-warning");
+				}
+			});
 		});
 	}
 
@@ -330,6 +380,7 @@
 		});
 
 		$("#merge-btn").on("click", openMergeChooser);
+		$("#clear-lock-btn").on("click", confirmClearLock);
 		$("#delete-btn").on("click", confirmDelete);
 		$("#merge-choices").on("change", "input", updateMergeSummary);
 		$mergeModal.on("click", ".modal-background, .modal-close-btn", closeMergeChooser);
@@ -455,6 +506,11 @@
 			<button id="merge-btn" class="button is-small" title="{% trans %}Merge{% endtrans %}" disabled>
 				<span class="icon"><i class="ph ph-arrows-merge"></i></span>
 				<span>{% trans %}Merge{% endtrans %}</span>
+			</button>
+			{# MSG: Button which clears the password lock on the selected singers. #}
+			<button id="clear-lock-btn" class="button is-small" title="{% trans %}Clear lock{% endtrans %}" disabled>
+				<span class="icon"><i class="ph ph-lock-key-open"></i></span>
+				<span>{% trans %}Clear lock{% endtrans %}</span>
 			</button>
 			{# MSG: Button which deletes the selected singers. #}
 			<button id="delete-btn" class="button is-small is-danger" title="{% trans %}Delete{% endtrans %}" disabled>

@@ -554,6 +554,13 @@
 					</span>
 					<input id="pref-fair-queue" type="checkbox" class="user-preference-checkbox switch ml-4 mr-0" data-pref="enable_fair_queue" {% if enable_fair_queue == True %}checked{% endif %}>
 				</label>
+				<label class="panel-block px-5 py-3 is-justify-content-space-between">
+					<span>
+						{# MSG: Checkbox label for making a singer password mandatory before queueing. #} {% trans %}Require a singer password{% endtrans %}
+						<span class="is-block is-size-7 has-text-grey-light">{% trans %}Everyone must set a password on their name before they can queue or favourite.{% endtrans %}</span>
+					</span>
+					<input id="pref-require-singer-password" type="checkbox" class="user-preference-checkbox switch ml-4 mr-0" data-pref="require_singer_password" {% if require_singer_password == True %}checked{% endif %}>
+				</label>
 			</div>
 
 			<hr class="my-0">

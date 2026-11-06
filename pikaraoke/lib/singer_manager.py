@@ -1,10 +1,13 @@
 """Singers: one row per performer, the id everything saved hangs off."""
 
+import hashlib
 import unicodedata
 from collections.abc import Callable
 
 from pikaraoke.lib.events import EventSystem
 from pikaraoke.lib.karaoke_database import KaraokeDatabase
+from pikaraoke.lib.password_hashing import hash_password
+from pikaraoke.lib.password_hashing import verify_password as verify_hash
 from pikaraoke.lib.queue_manager import PLACEHOLDER_SINGERS
 
 # The name is the singer's identity -- plays, favourites and the coming
@@ -244,6 +247,59 @@ class SingerManager:
         return {row["file_path"] for row in rows}
 
     # ------------------------------------------------------------------
+    # The name lock: an optional password that claims a username
+    # ------------------------------------------------------------------
+
+    def _lock_row(self, name: str) -> dict | None:
+        # The one place secret_hash is read, so find() and get_roster() never do.
+        name = normalize_name(name)
+        rows = self.db.query(
+            "SELECT id, secret_hash FROM singers "
+            "WHERE name = ? COLLATE NOCASE AND merged_into IS NULL",
+            (name,),
+        )
+        return dict(rows[0]) if rows else None
+
+    def is_protected(self, name: str) -> bool:
+        """Whether a name carries a password lock."""
+        row = self._lock_row(name)
+        return bool(row and row["secret_hash"])
+
+    def set_password(self, name: str, password: str) -> int:
+        """Claim a name with a password, creating the row; returns the singer id."""
+        singer_id = self.get_or_create(name, refresh_casing=False)
+        self.db.execute(
+            "UPDATE singers SET secret_hash = ? WHERE id = ?", (hash_password(password), singer_id)
+        )
+        return singer_id
+
+    def verify_password(self, name: str, password: str) -> int | None:
+        """The singer id when the password matches the name's lock, else None."""
+        row = self._lock_row(name)
+        if row is None or not row["secret_hash"]:
+            return None
+        return row["id"] if verify_hash(password, row["secret_hash"]) else None
+
+    def clear_password(self, name: str) -> bool:
+        """Drop a name's lock, keeping the singer and data; True if one was cleared."""
+        row = self._lock_row(name)
+        if row is None or not row["secret_hash"]:
+            return False
+        self.db.execute("UPDATE singers SET secret_hash = NULL WHERE id = ?", (row["id"],))
+        return True
+
+    def session_token(self, singer_id: int) -> str | None:
+        """A digest of the current lock, or None when unprotected.
+
+        Derived from secret_hash, not stored, so changing or clearing the password
+        rotates it and logs other devices out -- no column, and the hash never leaves.
+        """
+        rows = self.db.query("SELECT secret_hash FROM singers WHERE id = ?", (singer_id,))
+        if not rows or not rows[0]["secret_hash"]:
+            return None
+        return hashlib.sha256(rows[0]["secret_hash"].encode("utf-8")).hexdigest()
+
+    # ------------------------------------------------------------------
     # The roster, merge and delete (the admin Singers page)
     # ------------------------------------------------------------------
 
@@ -258,6 +314,9 @@ class SingerManager:
                    s.name,
                    s.merged_into,
                    surv.name AS merged_into_name,
+                   -- A computed flag, never the hash itself: enough to draw a lock
+                   -- icon and offer clear-lock, nothing the row could leak.
+                   s.secret_hash IS NOT NULL AS protected,
                    COUNT(p.id) AS play_count,
                    -- Stored UTC, shown wall-clock, converted here in SQL.
                    datetime(s.created_at, 'localtime') AS added
@@ -270,6 +329,8 @@ class SingerManager:
         roster = []
         for row in rows:
             singer = dict(row)
+            # SQLite gives a bare 0/1 for the IS NOT NULL test; the page wants a bool.
+            singer["protected"] = bool(singer["protected"])
             # Randomizer and Pikaraoke are the system's own names, not people: the
             # page excludes them from merge and delete, as rename already does.
             singer["is_system"] = singer["name"].lower() in PLACEHOLDER_SINGERS

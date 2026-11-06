@@ -280,6 +280,7 @@ def test_preference_manager_defaults_exist():
         "autoplay",
         "limit_user_songs_by",
         "enable_fair_queue",
+        "require_singer_password",
         "cdg_pixel_scaling",
         "avsync",
         "browse_results_per_page",

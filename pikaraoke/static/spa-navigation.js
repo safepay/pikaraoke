@@ -88,6 +88,12 @@
         const $input = $('#text-prompt-input');
         const $ok = $('#text-prompt-ok');
         const $secondary = $('#text-prompt-secondary');
+        // The password field is the identity dialog's; every other caller leaves
+        // opts.password unset and the field hidden, so it never shows for them.
+        const pw = opts.password || null;
+        const $pwField = $('#text-prompt-password-field');
+        const $pw = $('#text-prompt-password');
+        const $pwError = $('#text-prompt-password-error');
 
         $('#text-prompt-title').text(opts.title || '');
         $('#text-prompt-message').text(opts.message || '').toggleClass('is-hidden', !opts.message);
@@ -97,6 +103,15 @@
         // Null clears it, so a cap never leaks into another caller of this prompt.
         $input.attr('maxlength', opts.maxlength || null);
         if (opts.submitLabel) { $ok.text(opts.submitLabel); }
+
+        $pwField.toggleClass('is-hidden', !pw);
+        $pw.val('');
+        $pwError.addClass('is-hidden').text('');
+        if (pw) {
+            $('#text-prompt-password-label').text(pw.label || '');
+            $('#text-prompt-password-help').text(pw.help || '').toggleClass('is-hidden', !pw.help);
+            $pw.attr('placeholder', pw.placeholder || '').attr('autocomplete', pw.autocomplete || 'off');
+        }
         // A left-pushed quiet action (e.g. log out), shown only when the caller
         // asks for one, with an optional leading icon; its click rejects with
         // { secondary: true } so the caller tells it apart from a plain cancel.
@@ -111,18 +126,44 @@
         // Namespaced so a prior, unclosed prompt leaves no handler behind.
         function teardown() {
             $modal.removeClass('is-active');
+            $pwField.addClass('is-hidden');
+            $pw.val('');
             $ok.off('.prompt');
             $secondary.off('.prompt');
             $modal.find('.text-prompt-cancel, .modal-background').off('.prompt');
             $input.off('.prompt');
+            $pw.off('.prompt');
+        }
+        function okDisabled() {
+            if (!$input.val().trim()) { return true; }
+            return !!(pw && pw.required && !$pw.val());
         }
         function accept() {
-            const value = $input.val().trim();
-            if (!value) {
-                return; // Save stays inert on a blank name.
+            if (okDisabled()) {
+                return; // Save stays inert on a blank name or a missing required password.
             }
-            teardown();
-            d.resolve(value);
+            const value = $input.val().trim();
+            if (!pw) {
+                teardown();
+                d.resolve(value);
+                return;
+            }
+            const values = { value: value, password: $pw.val() };
+            $pwError.addClass('is-hidden').text('');
+            if (!pw.onSubmit) {
+                teardown();
+                d.resolve(values);
+                return;
+            }
+            // Async: the dialog stays open and shows the reason if the submit fails
+            // (a wrong password, a taken name), so the singer can try again.
+            $ok.prop('disabled', true);
+            pw.onSubmit(values)
+                .done(function (result) { teardown(); d.resolve(result || values); })
+                .fail(function (message) {
+                    $pwError.text(message || window.translations.errorLabel).removeClass('is-hidden');
+                    $ok.prop('disabled', okDisabled());
+                });
         }
         function dismiss() {
             teardown();
@@ -136,7 +177,7 @@
         $ok.on('click.prompt', accept);
         $secondary.on('click.prompt', chooseSecondary);
         $modal.find('.text-prompt-cancel, .modal-background').on('click.prompt', dismiss);
-        $input.on('keydown.prompt', function (e) {
+        function onKey(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 accept();
@@ -144,12 +185,14 @@
                 e.preventDefault();
                 dismiss();
             }
-        });
-        $input.on('input.prompt', function () {
-            $ok.prop('disabled', !$input.val().trim());
-        });
+        }
+        $input.on('keydown.prompt', onKey);
+        $pw.on('keydown.prompt', onKey);
+        function refreshOk() { $ok.prop('disabled', okDisabled()); }
+        $input.on('input.prompt', refreshOk);
+        $pw.on('input.prompt', refreshOk);
 
-        $ok.prop('disabled', !$input.val().trim());
+        refreshOk();
         $modal.addClass('is-active');
         $input.trigger('focus').trigger('select');
         return d;
@@ -197,13 +240,70 @@
         return d;
     };
 
-    // Identity wrapper: resolves { name } so a later language or avatar is an
-    // added key, not a changed return shape.
+    // A name's lock state, for the dialog to decide claim vs log in vs plain.
+    function fetchSingerStatus(name) {
+        return $.getJSON(window.pikaraokeConfig.statusUrl, { name: name || '' });
+    }
+
+    // Carry out the password half of the dialog for the name as typed at save.
+    // Resolves { name, action, authed }; rejects with a message the dialog shows.
+    function submitIdentity(values) {
+        const t = window.translations;
+        const cfg = window.pikaraokeConfig;
+        const name = values.value;
+        const password = values.password;
+        const out = $.Deferred();
+        fetchSingerStatus(name).always(function (status) {
+            status = (status && typeof status === 'object') ? status : {};
+            function fail(xhr) { out.reject((xhr.responseJSON && xhr.responseJSON.error) || t.errorLabel); }
+            if (status.protected && !status.authenticated) {
+                if (!password) { return out.reject(t.passwordNeeded); }
+                $.ajax({ url: cfg.loginUrl, method: 'POST', data: { name: name, password: password } })
+                    .done(function () { out.resolve({ name: name, action: 'login', authed: true }); })
+                    .fail(fail);
+            } else if (password) {
+                $.ajax({ url: cfg.passwordUrl, method: 'POST', data: { name: name, password: password } })
+                    .done(function () { out.resolve({ name: name, action: 'claim', authed: true }); })
+                    .fail(fail);
+            } else if (status.required) {
+                out.reject(t.passwordNeeded);
+            } else {
+                out.resolve({ name: name, action: 'plain', authed: false });
+            }
+        });
+        return out;
+    }
+
+    // Identity dialog: name plus, when the name lock calls for it, a password to
+    // claim a name or log in to one. Resolves { name, action, authed }; action is
+    // "login", "claim", or "plain" (a bare name change the caller handles).
     window.promptForIdentity = function (opts) {
+        opts = opts || {};
+        const t = window.translations;
         const d = $.Deferred();
-        window.promptForText(opts)
-            .done(function (name) { d.resolve({ name: name }); })
-            .fail(function (reason) { d.reject(reason); });
+        fetchSingerStatus(opts.value || '').always(function (status) {
+            status = (status && typeof status === 'object') ? status : {};
+            const mustLogin = !!(status.protected && !status.authenticated);
+            const mustSet = !!(status.required && !status.protected);
+            // Hidden only when the name is already this device's protected login;
+            // otherwise offered -- to log in, to claim, or as an optional upgrade.
+            const showPw = mustLogin || !status.protected;
+            const pw = showPw ? {
+                label: t.passwordLabel,
+                placeholder: t.passwordPlaceholder,
+                help: mustLogin ? t.passwordLoginHelp : mustSet ? t.passwordRequiredHelp : t.passwordOptionalHelp,
+                required: mustLogin || mustSet,
+                autocomplete: mustLogin ? 'current-password' : 'new-password',
+                onSubmit: submitIdentity
+            } : null;
+            window.promptForText(Object.assign({}, opts, { password: pw }))
+                .done(function (res) {
+                    d.resolve(typeof res === 'string'
+                        ? { name: res, action: 'plain', authed: false }
+                        : res);
+                })
+                .fail(function (reason) { d.reject(reason); });
+        });
         return d;
     };
 
@@ -298,7 +398,17 @@
                 secondaryIcon: joining ? null : 'ph-sign-out',
                 value: currentName
             }).done(function (res) {
-                if (joining) {
+                if (res.action === 'login' || res.action === 'claim') {
+                    // The device is now logged in to the name; a cookie write, no move.
+                    const changed = window.setIdentity(res.name);
+                    window.showNotification(
+                        res.action === 'claim'
+                            ? t.passwordSet
+                            : t.loggedIn.replace('{name}', res.name),
+                        'is-success'
+                    );
+                    if (changed && window.spaNavigation) { window.spaNavigation.rerender(); }
+                } else if (joining) {
                     // Naming an anonymous device: a plain cookie write, no move.
                     if (window.setIdentity(res.name) && window.spaNavigation) {
                         window.spaNavigation.rerender();
