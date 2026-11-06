@@ -34,6 +34,7 @@
       // The name-lock endpoints the identity dialog drives.
       passwordUrl: "{% if not blank_page %}{{ url_for('singers_api.set_password') }}{% endif %}",
       loginUrl: "{% if not blank_page %}{{ url_for('singers_api.login_singer') }}{% endif %}",
+      logoutUrl: "{% if not blank_page %}{{ url_for('singers_api.logout_singer') }}{% endif %}",
       statusUrl: "{% if not blank_page %}{{ url_for('singers_api.singer_status') }}{% endif %}",
       singerNameMaxLength: {{ singer_name_max_length }}
     };

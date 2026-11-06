@@ -39,6 +39,7 @@ _BASE_TEMPLATE_ENDPOINTS = [
     ("/api/singer/rename", "singers_api.rename_singer"),
     ("/api/singer/password", "singers_api.set_password"),
     ("/api/singer/login", "singers_api.login_singer"),
+    ("/api/singer/logout", "singers_api.logout_singer"),
     ("/api/singer/status", "singers_api.singer_status"),
 ]
 

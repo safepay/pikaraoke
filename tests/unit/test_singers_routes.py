@@ -364,3 +364,26 @@ class TestNameLockRoutes:
             data={"song": "/s/a.mp4", "starred": "true", "song_added_by": "Newbie"},
         )
         assert resp.get_json()["auth_required"] is True
+
+    def test_login_returns_the_canonical_name_not_the_typed_casing(self, env):
+        # The owner claimed "Andrew"; logging in as "andrew" must report "Andrew"
+        # back, so the device adopts the stored casing rather than overwriting it.
+        client, sm, _ = env
+        sm.set_password("Andrew", "hunter2")
+        resp = client.post("/api/singer/login", data={"name": "andrew", "password": "hunter2"})
+        assert resp.status_code == 200
+        assert resp.get_json()["name"] == "Andrew"
+
+    def test_logout_drops_the_session_so_the_name_relocks(self, env):
+        # Log in, log out, then a protected favourite under the name is refused:
+        # proof the server session is gone, not just the client's name cookie.
+        client, sm, _ = env
+        sm.set_password("Dave", "hunter2")
+        client.post("/api/singer/login", data={"name": "Dave", "password": "hunter2"})
+        client.set_cookie("user", "Dave")
+        client.post("/api/singer/logout")
+        resp = client.post(
+            "/api/singer/favourite",
+            data={"song": "/s/a.mp4", "starred": "true", "song_added_by": "Dave"},
+        )
+        assert resp.get_json()["auth_required"] is True
