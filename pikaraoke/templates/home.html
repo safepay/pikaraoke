@@ -238,6 +238,10 @@
 		var resumeAt = np.now_playing_position || 0;
 		if (watchHls) { watchHls.destroy(); watchHls = null; }
 		video.muted = true;
+		// Joining a paused song, seek to the live frame but do not play on: the
+		// paused master emits no position beacons, so nothing would re-sync a
+		// phone that ran ahead. The seek renders that frame on the paused element.
+		var startPaused = !!np.is_paused;
 		// iOS Safari plays HLS natively; everyone else needs hls.js.
 		var useNativeHLS = video.canPlayType("application/vnd.apple.mpegurl") && !waIsChrome && !waIsEdge && !waIsMobileSafari;
 		if (useNativeHLS) {
@@ -248,7 +252,7 @@
 					video.removeEventListener("loadedmetadata", onMeta);
 				});
 			}
-			video.play().catch(function () {});
+			if (!startPaused) video.play().catch(function () {});
 		} else {
 			ensureHls().then(function () {
 				// A newer song may have swapped the target while hls.js loaded.
@@ -256,7 +260,7 @@
 				watchHls = new Hls({ startPosition: resumeAt });
 				watchHls.loadSource(streamUrl);
 				watchHls.attachMedia(video);
-				video.play().catch(function () {});
+				if (!startPaused) video.play().catch(function () {});
 			}).catch(function () {});
 		}
 	}
