@@ -188,6 +188,10 @@
 	var watchHls = null;
 	var watchAttachedUrl = null;
 	var watchHlsPromise = null;
+	// Open state for the current song only, in memory not a cookie, so the
+	// stream is never inherited by the next singer or across a reload.
+	var watchOpen = false;
+	var watchSongUrl = null;
 
 	var waUA = navigator.userAgent;
 	var waIsSafari = /^((?!chrome|android).)*safari/i.test(waUA);
@@ -196,10 +200,6 @@
 	var waIsEdge = /edg/i.test(waUA);
 
 	function watchVideo() { return document.getElementById("watch-video"); }
-	function watchWantsOn() { return Cookies.get("watch_along") === "1"; }
-	function setWatchCookie(on) {
-		Cookies.set("watch_along", on ? "1" : "0", { expires: 3650, path: window.pikaraokeConfig.cookiePath });
-	}
 
 	// Inject hls.js on first use, and only off iOS, which plays HLS natively.
 	function ensureHls() {
@@ -286,6 +286,13 @@
 	function renderWatchAlong(np) {
 		var playing = !!(np && np.now_playing && np.now_playing_url);
 		var cued = !!(np && !np.now_playing && np.up_next);
+		// The open flag belongs to the song playing when it was opened; drop it
+		// when a different song takes over so the next singer must tap for it.
+		var songUrl = playing ? np.now_playing_url : null;
+		if (watchSongUrl !== null && songUrl !== watchSongUrl) {
+			watchOpen = false;
+		}
+		watchSongUrl = songUrl;
 		if (!enablePhoneVideo || (!playing && !cued)) {
 			$("#watch-along").addClass("is-hidden");
 			$("#watch-along-panel").addClass("is-hidden");
@@ -302,8 +309,8 @@
 		}
 		$("#watch-along-note").addClass("is-hidden");
 		// The panel can only show a stream, so a cued song shows just the button
-		// (armed via the cookie) until it starts; a tap still opens it at once.
-		setWatchOpen(watchWantsOn() && playing);
+		// until it starts; a tap opens it the moment the song is playing.
+		setWatchOpen(watchOpen && playing);
 	}
 
 	// Drift-correct the watch video against the room clock, exactly as a slave
@@ -507,11 +514,11 @@
 			wv.addEventListener("volumechange", function () { if (!wv.muted) wv.muted = true; });
 		}
 		$("#watch-open").on("click", function () {
-			setWatchCookie(true);
+			watchOpen = true;
 			setWatchOpen(true);
 		});
 		$("#watch-hide").on("click", function () {
-			setWatchCookie(false);
+			watchOpen = false;
 			setWatchOpen(false);
 		});
 		$("#watch-fullscreen").on("click", enterWatchFullscreen);
