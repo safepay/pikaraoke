@@ -456,6 +456,50 @@ class KaraokeDatabase:
             return self._conn.execute(sql, params)
 
     # ------------------------------------------------------------------
+    # Backup and restore (durable-table snapshot and whole-graph reload)
+    # ------------------------------------------------------------------
+
+    @property
+    def schema_version(self) -> int:
+        """The schema version this build writes, stamped into every dump."""
+        return _SCHEMA_VERSION
+
+    def snapshot_tables(self, table_names: list[str]) -> dict[str, list[dict]]:
+        """Read every row of the named tables as plain dicts, ids included."""
+        with self._lock:
+            return {
+                name: [dict(row) for row in self._conn.execute(f"SELECT * FROM {name}").fetchall()]
+                for name in table_names
+            }
+
+    def replace_tables(self, table_data: dict[str, list[dict]]) -> None:
+        """Clear the named tables and reload them from dicts in one transaction.
+
+        Deferred foreign keys let rows load in any order -- including a singer
+        whose merged_into points at one not yet inserted -- checked once at
+        commit, so a bad dump rolls back and leaves the current data untouched.
+        Only columns present in both the dump and the live table are written, so
+        an older dump loads with the newer columns at their defaults. Reloading
+        each row under its id advances the AUTOINCREMENT sequence past it.
+        """
+        with self._lock, self._conn:
+            self._conn.execute("PRAGMA defer_foreign_keys = ON")
+            for name in table_data:
+                self._conn.execute(f"DELETE FROM {name}")
+            for name, rows in table_data.items():
+                live_cols = {row[1] for row in self._conn.execute(f"PRAGMA table_info({name})")}
+                for row in rows:
+                    cols = [c for c in row if c in live_cols]
+                    if not cols:
+                        continue
+                    columns = ", ".join(cols)
+                    placeholders = ", ".join(f":{c}" for c in cols)
+                    self._conn.execute(
+                        f"INSERT INTO {name} ({columns}) VALUES ({placeholders})",
+                        {c: row[c] for c in cols},
+                    )
+
+    # ------------------------------------------------------------------
     # Maintenance
     # ------------------------------------------------------------------
 
