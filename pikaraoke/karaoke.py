@@ -13,6 +13,7 @@ import qrcode
 from flask_babel import _
 from qrcode.image.pure import PyPNGImage
 
+from pikaraoke.lib import db_backup
 from pikaraoke.lib.backup_manager import BackupManager
 from pikaraoke.lib.download_manager import DownloadManager
 from pikaraoke.lib.duration_populator import DurationPopulator
@@ -427,6 +428,28 @@ class Karaoke:
         finally:
             self._sync_lock.release()
             self.events.emit("sync_finished")
+
+    def restore_database(self, dump: dict) -> None:
+        """Replace the durable tables from a dump, then resync against the files.
+
+        Raises BackupVersionError before touching anything if the dump was taken
+        on a newer schema than this build.
+        """
+        db_backup.restore_dump(self.db, dump)
+        self.song_manager.songs.update(self.db.get_all_song_paths())
+        self.events.emit(
+            "notification", _("Database restored. Syncing against your songs."), "success"
+        )
+        self.sync_library()
+
+    def reset_database(self) -> None:
+        """Erase the whole database, then rebuild the identity rows from the files."""
+        self.db.clear_all_tables()
+        self.song_manager.songs.update(self.db.get_all_song_paths())
+        self.events.emit(
+            "notification", _("Database reset. Rebuilding from your songs."), "warning"
+        )
+        self.sync_library()
 
     def _load_preferences(self, **cli_overrides: Any) -> None:
         """Load preference-driven attributes from config file.

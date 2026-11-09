@@ -499,6 +499,25 @@ class KaraokeDatabase:
                         {c: row[c] for c in cols},
                     )
 
+    def clear_all_tables(self) -> None:
+        """Empty every table: the whole-database reset.
+
+        Durable metadata, singers and history all go; the identity rows rebuild
+        from the media files on the next scan. Deferred foreign keys let the
+        tables clear in any order within one transaction.
+        """
+        with self._lock, self._conn:
+            self._conn.execute("PRAGMA defer_foreign_keys = ON")
+            names = [
+                row[0]
+                for row in self._conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table' "
+                    "AND name NOT LIKE 'sqlite_%'"
+                )
+            ]
+            for name in names:
+                self._conn.execute(f"DELETE FROM {name}")
+
     # ------------------------------------------------------------------
     # Maintenance
     # ------------------------------------------------------------------
