@@ -291,6 +291,171 @@
 				});
 			});
 
+			// --- Backup and restore ---
+			var backupNowUrl = {{ url_for('backup_api.backup_now') | tojson }};
+			var backupListUrl = {{ url_for('backup_api.list_backups') | tojson }};
+			var restoreUploadUrl = {{ url_for('backup_api.restore_upload') | tojson }};
+			var resetDbUrl = {{ url_for('backup_api.reset_database') | tojson }};
+			var restoreTmpl = {{ url_for('backup_api.restore_backup', name='__NAME__') | tojson }};
+			var downloadTmpl = {{ url_for('backup_api.download_backup', name='__NAME__') | tojson }};
+			function restoreUrl(name) { return restoreTmpl.replace("__NAME__", encodeURIComponent(name)); }
+			function downloadUrl(name) { return downloadTmpl.replace("__NAME__", encodeURIComponent(name)); }
+
+			function saveBlob(blob, filename) {
+				var url = URL.createObjectURL(blob);
+				var a = document.createElement("a");
+				a.href = url;
+				a.download = filename;
+				document.body.appendChild(a);
+				a.click();
+				a.remove();
+				URL.revokeObjectURL(url);
+			}
+
+			function filenameFrom(resp, fallback) {
+				var m = /filename="?([^"]+)"?/.exec(resp.headers.get("Content-Disposition") || "");
+				return m ? m[1] : fallback;
+			}
+
+			function loadBackups() {
+				$.post(backupListUrl).done(function(data) { renderBackups(data.backups || []); });
+			}
+
+			function renderBackups(backups) {
+				var $list = $("#backups-list").empty();
+				if (!backups.length) {
+					// {# MSG: Shown in the backups list when there are no backups yet. #}
+					$list.append($("<p class='has-text-grey-light'>").text({{ _('No backups yet.') | tojson }}));
+					return;
+				}
+				backups.forEach(function(b) {
+					var when = b.created_at ? new Date(b.created_at).toLocaleString() : b.name;
+					var $row = $("<div class='is-flex is-justify-content-space-between is-align-items-center py-1'>");
+					var $meta = $("<span>").append($("<strong>").text(when));
+					if (b.song_count != null) {
+						// {# MSG: Count of songs in a backup row, e.g. "42 songs". #}
+						$meta.append($("<span class='has-text-grey-light ml-2'>").text(b.song_count + " " + {{ _('songs') | tojson }}));
+					}
+					var $actions = $("<span class='buttons are-small is-flex-shrink-0 ml-2 mb-0'>");
+					$actions.append(
+						$("<button class='button is-small is-danger is-outlined mb-0 backup-restore-btn'>").text({{ _('Restore') | tojson }}).attr("data-name", b.name),
+						$("<button class='button is-small mb-0 backup-download-btn'>").text({{ _('Download') | tojson }}).attr("data-name", b.name)
+					);
+					$list.append($row.append($meta, $actions));
+				});
+			}
+
+			$("#backup-now-btn").click(function() {
+				var $btn = $(this).addClass("is-loading").prop("disabled", true);
+				fetch(backupNowUrl, { method: "POST" }).then(function(r) {
+					if (!r.ok) throw new Error();
+					return r.blob().then(function(blob) { saveBlob(blob, filenameFrom(r, "pikaraoke-backup.json")); });
+				}).then(function() {
+					// {# MSG: Notification after a backup is written and downloaded. #}
+					showNotification({{ _('Backup saved and downloaded') | tojson }}, "is-success");
+					loadBackups();
+				}).catch(function() {
+					// {# MSG: Notification when writing a backup failed. #}
+					showNotification({{ _('Backup failed') | tojson }}, "is-danger");
+				}).finally(function() {
+					$btn.removeClass("is-loading").prop("disabled", false);
+				});
+			});
+
+			$("#backups-list").on("click", ".backup-download-btn", function() {
+				var name = $(this).attr("data-name");
+				fetch(downloadUrl(name), { method: "POST" }).then(function(r) {
+					if (!r.ok) throw new Error();
+					return r.blob().then(function(blob) { saveBlob(blob, filenameFrom(r, name)); });
+				}).catch(function() {
+					// {# MSG: Notification when downloading an earlier backup failed. #}
+					showNotification({{ _('Could not download the backup') | tojson }}, "is-danger");
+				});
+			});
+
+			function runRestore(url, body) {
+				var opts = { method: "POST" };
+				if (body) opts.body = body;
+				fetch(url, opts).then(function(r) {
+					return r.json().then(function(data) { return { ok: r.ok, data: data }; });
+				}).then(function(res) {
+					if (res.ok && res.data.success) {
+						// {# MSG: Notification after the database is restored from a backup. #}
+						showNotification({{ _('Database restored') | tojson }}, "is-success");
+						loadBackups();
+					} else {
+						// {# MSG: Notification when a restore failed. #}
+						showNotification(res.data.error || {{ _('Restore failed') | tojson }}, "is-danger");
+					}
+				}).catch(function() {
+					showNotification({{ _('Restore failed') | tojson }}, "is-danger");
+				});
+			}
+
+			$("#backups-list").on("click", ".backup-restore-btn", function() {
+				var name = $(this).attr("data-name");
+				confirmAction({
+					// {# MSG: Title of the confirm dialog before restoring a backup. #}
+					title: {{ _('Restore this backup?') | tojson }},
+					// {# MSG: Body of the restore confirm dialog. #}
+					message: {{ _('The database is replaced from this backup, then synced against your song files.') | tojson }},
+					// {# MSG: Irreversibility line in the restore confirm dialog. #}
+					warning: {{ _('The current database is backed up first, then overwritten.') | tojson }},
+					// {# MSG: Confirm button label in the restore dialog. #}
+					confirmLabel: {{ _('Restore') | tojson }},
+					danger: true
+				}).done(function() { runRestore(restoreUrl(name), null); });
+			});
+
+			$("#backup-upload-btn").click(function() {
+				$("#backup-upload-input").val("").click();
+			});
+			$("#backup-upload-input").change(function() {
+				var file = this.files && this.files[0];
+				if (!file) return;
+				confirmAction({
+					// {# MSG: Title of the confirm dialog before restoring an uploaded backup. #}
+					title: {{ _('Restore from this file?') | tojson }},
+					// {# MSG: Body of the upload-restore confirm dialog. #}
+					message: {{ _('The database is replaced from the uploaded backup, then synced against your song files.') | tojson }},
+					warning: {{ _('The current database is backed up first, then overwritten.') | tojson }},
+					confirmLabel: {{ _('Restore') | tojson }},
+					danger: true
+				}).done(function() {
+					var form = new FormData();
+					form.append("file", file);
+					runRestore(restoreUploadUrl, form);
+				});
+			});
+
+			$("#reset-database-btn").click(function() {
+				confirmAction({
+					// {# MSG: Title of the confirm dialog before erasing the whole database. #}
+					title: {{ _('Reset the whole database?') | tojson }},
+					// {# MSG: Body of the reset-database confirm dialog. #}
+					message: {{ _('Erases the song metadata, singers and play history. The song index rebuilds from your files.') | tojson }},
+					// {# MSG: Irreversibility line in the reset-database confirm dialog. #}
+					warning: {{ _('The current database is backed up first, then erased. This cannot be undone.') | tojson }},
+					// {# MSG: Confirm button label in the reset-database dialog. #}
+					confirmLabel: {{ _('Reset database') | tojson }},
+					danger: true
+				}).done(function() {
+					$.post(resetDbUrl).done(function(data) {
+						if (data && data.success) {
+							// {# MSG: Notification after the database is reset. #}
+							showNotification({{ _('Database reset') | tojson }}, "is-success");
+							loadBackups();
+						} else {
+							showNotification((data && data.error) || {{ _('Reset failed') | tojson }}, "is-danger");
+						}
+					}).fail(function(xhr) {
+						showNotification((xhr.responseJSON && xhr.responseJSON.error) || {{ _('Reset failed') | tojson }}, "is-danger");
+					});
+				});
+			});
+
+			loadBackups();
+
 			// SocketIO: manage Sync Now button state
 			window.onPageSocket("sync_started", function() {
 				$("#sync-library-btn").addClass("is-loading").prop("disabled", true);
@@ -679,6 +844,53 @@
 						</select>
 					</div>
 				</div>
+
+				{# Backup and restore, grouped under one subheading inside the Database
+				   section so they read as a unit without scattering among the settings. #}
+				<div class="panel-block px-5 pt-4 pb-2">
+					{# MSG: Subheading grouping the database backup and restore controls. #}
+					<h4 class="title is-6 m-0">{% trans %}Backup &amp; restore{% endtrans %}</h4>
+				</div>
+				<div class="panel-block px-5 py-3 is-justify-content-space-between">
+					<span>
+						{# MSG: Help text under the Backup Now button. #}
+						{% trans %}Save the metadata, play history and singers that the song files cannot rebuild.{% endtrans %}
+						<span class="is-block is-size-7 has-text-grey-light">{% trans %}Writes a backup on the server and downloads a copy to this device.{% endtrans %}</span>
+					</span>
+					{# MSG: Button that writes a database backup and downloads it. #}
+					<button id="backup-now-btn" class="button is-primary is-flex-shrink-0 ml-4">{% trans %}Back up now{% endtrans %}</button>
+				</div>
+				<div class="panel-block px-5 py-3">
+					{# Filled by JS from /api/backups/list: one row per server backup, each
+					   with Restore and Download. #}
+					<div id="backups-list" class="is-flex-grow-1 is-size-7"></div>
+				</div>
+				<div class="panel-block px-5 py-3 is-justify-content-space-between">
+					<span>
+						{# MSG: Help text beside the Upload a backup button. #}
+						{% trans %}Restore from a backup kept on another device.{% endtrans %}
+					</span>
+					<input id="backup-upload-input" type="file" accept="application/json,.json" class="is-hidden">
+					{# MSG: Button that opens a file picker to restore from an uploaded backup. #}
+					<button id="backup-upload-btn" class="button is-flex-shrink-0 ml-4">{% trans %}Upload a backup{% endtrans %}</button>
+				</div>
+				<label class="panel-block px-5 py-3 is-justify-content-space-between">
+					<span>{# MSG: Switch label to write a backup each time the server starts. #} {% trans %}Back up when the server starts{% endtrans %}</span>
+					<input id="pref-backup-on-startup" type="checkbox" class="user-preference-checkbox switch ml-4 mr-0" data-pref="backup_on_startup" {% if backup_on_startup == True %}checked{% endif %}>
+				</label>
+				<div class="panel-block px-5 py-3 is-justify-content-space-between">
+					<label for="pref-keep-backups">{# MSG: Label for the number of backups to keep before the oldest are pruned. #} {% trans %}Backups to keep{% endtrans %}</label>
+					<input id="pref-keep-backups" class="user-preference-input input is-flex-shrink-0 ml-4" type="number" min="1" max="999" data-pref="keep_backups" data-start-value="{{ keep_backups }}" value="{{ keep_backups }}">
+				</div>
+				<div class="panel-block px-5 py-3 is-justify-content-space-between">
+					<span>
+						{# MSG: Label for the read-only backup directory path. #}
+						{% trans %}Backup location{% endtrans %}
+						{# MSG: Help text noting the backup location is set at launch. #}
+						<span class="is-block is-size-7 has-text-grey-light">{% trans %}Set at launch with --backup-path. Point it at a USB drive or network share to keep backups off this machine.{% endtrans %}</span>
+					</span>
+					<span class="is-family-monospace is-size-7 has-text-grey ml-4" style="word-break: break-all;">{{ backup_path }}</span>
+				</div>
 			</div>
 
 			<hr class="my-0">
@@ -818,6 +1030,12 @@
 					<span>{% trans %}Deletes every session and every play on record. This cannot be undone.{% endtrans %}</span>
 					{# MSG: Button which deletes the entire play history, every session and every play. #}
 					<button id="reset-history-btn" class="button is-danger is-outlined is-flex-shrink-0 ml-4">{% trans %}Reset all history{% endtrans %}</button>
+				</div>
+				<div class="panel-block px-5 py-3 is-justify-content-space-between">
+					{# MSG: Help text explaining what Reset database does. #}
+					<span>{% trans %}Erases the whole database: the song metadata, singers and play history together. The song index rebuilds from the files. This cannot be undone.{% endtrans %}</span>
+					{# MSG: Button which erases the entire database. #}
+					<button id="reset-database-btn" class="button is-danger is-outlined is-flex-shrink-0 ml-4">{% trans %}Reset database{% endtrans %}</button>
 				</div>
 			</div>
 		</div>

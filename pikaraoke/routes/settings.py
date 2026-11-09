@@ -80,4 +80,7 @@ def settings():
         mic_passthrough_enabled=k.enable_mic_passthrough,
         keep_awake=k.keep_awake,
         keep_awake_unsupported=keep_awake.unsupported_reason(),
+        backup_on_startup=k.backup_on_startup,
+        keep_backups=k.keep_backups,
+        backup_path=k.backup_path,
     )
