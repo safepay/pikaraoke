@@ -186,6 +186,15 @@ def parse_pikaraoke_args() -> argparse.Namespace:
         required=False,
     )
 
+    backup = parser.add_argument_group("Backup and restore")
+    backup.add_argument(
+        "--backup-path",
+        nargs="+",
+        help="Directory for database backups. Point it at a mounted USB or NAS to write backups off the SD card. Persists to the config file. (default: a 'backups' folder beside the database)",
+        default=None,
+        required=False,
+    )
+
     splash = parser.add_argument_group("Splash screen")
     splash.add_argument(
         "--hide-splash-screen",
@@ -427,9 +436,14 @@ def parse_pikaraoke_args() -> argparse.Namespace:
 
     dl_path = os.path.expanduser(arg_path_parse(args.download_path) or default_dl_dir)
 
+    backup_path = arg_path_parse(args.backup_path)
+    if backup_path is not None:
+        backup_path = os.path.expanduser(backup_path)
+
     args.logo_path = logo_path
     args.bg_music_path = bg_music_path
     args.bg_video_path = bg_video_path
     args.download_path = dl_path
+    args.backup_path = backup_path
 
     return args

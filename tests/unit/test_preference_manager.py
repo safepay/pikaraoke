@@ -296,6 +296,9 @@ def test_preference_manager_defaults_exist():
         "metadata_provider",
         "itunes_search_country",
         "suggestion_name_order",
+        "backup_path",
+        "backup_on_startup",
+        "keep_backups",
     }
 
     assert set(PreferenceManager.DEFAULTS.keys()) == expected_keys
@@ -326,6 +329,8 @@ def test_preference_manager_defaults_types():
     assert isinstance(defaults["screensaver_timeout"], int)
     assert isinstance(defaults["limit_user_songs_by"], int)
     assert isinstance(defaults["avsync"], (int, float))
+    assert isinstance(defaults["keep_backups"], int)
+    assert defaults["backup_on_startup"] is True
 
     # Float preferences
     assert isinstance(defaults["volume"], float)
@@ -337,6 +342,7 @@ def test_preference_manager_defaults_types():
     assert isinstance(defaults["mid_score_phrases"], str)
     assert isinstance(defaults["high_score_phrases"], str)
     assert isinstance(defaults["itunes_search_country"], str)
+    assert isinstance(defaults["backup_path"], str)
 
 
 def test_preference_manager_get_or_default_returns_default(temp_config_file):

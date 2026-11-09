@@ -281,6 +281,7 @@ def main() -> None:
         socketio=socketio,
         preferred_language=args.preferred_language,
         url_base_path=args.base_path,
+        backup_path=args.backup_path,
     )
 
     # 'autoplay' defaults on, which the store_true CLI path can't express (it

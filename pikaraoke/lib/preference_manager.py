@@ -57,6 +57,11 @@ class PreferenceManager:
         "metadata_provider": "itunes",
         "itunes_search_country": "US",
         "suggestion_name_order": "artist_title",
+        # Empty means the default location beside the database; set by
+        # --backup-path and shown read-only, as a launch-set location.
+        "backup_path": "",
+        "backup_on_startup": True,
+        "keep_backups": 10,
     }
 
     def __init__(self, config_file_path: str = "config.ini", target: object | None = None) -> None:

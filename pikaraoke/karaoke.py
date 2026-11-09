@@ -13,6 +13,7 @@ import qrcode
 from flask_babel import _
 from qrcode.image.pure import PyPNGImage
 
+from pikaraoke.lib.backup_manager import BackupManager
 from pikaraoke.lib.download_manager import DownloadManager
 from pikaraoke.lib.duration_populator import DurationPopulator
 from pikaraoke.lib.events import EventSystem
@@ -141,6 +142,9 @@ class Karaoke:
         volume: float | None = None,
         enable_title_tidy: bool | None = None,
         enable_folder_browsing: bool | None = None,
+        backup_path: str | None = None,
+        backup_on_startup: bool | None = None,
+        keep_backups: int | None = None,
     ) -> None:
         """Initialize the Karaoke instance.
 
@@ -238,6 +242,13 @@ class Karaoke:
 
         # Initialize database, scanner, and song manager (startup runs at end of __init__)
         self.db = KaraokeDatabase()
+        # Empty backup_path means the default location beside the database.
+        self.backup_path = self.backup_path or os.path.join(get_data_directory(), "backups")
+        self.backup_manager = BackupManager(
+            self.db,
+            self.backup_path,
+            get_keep_count=lambda: self.keep_backups,  # pylint: disable=no-member
+        )
         self.song_manager = SongManager(
             self.download_path,
             db=self.db,
@@ -351,6 +362,18 @@ class Karaoke:
             logging.info("No existing database found, scanning song directory")
             result = self._scanner.scan(self.download_path)
             self._apply_scan_result(result)
+
+        if self.backup_on_startup:  # pylint: disable=no-member
+            self._startup_backup()
+
+    def _startup_backup(self) -> None:
+        """Write a pre-session backup, never letting a failure block boot."""
+        try:
+            path = self.backup_manager.startup_backup()
+            if path:
+                logging.info(f"Startup database backup: {path}")
+        except (OSError, ValueError) as e:
+            logging.error(f"Startup database backup failed: {e}")
 
     def _apply_scan_result(self, result: ScanResult) -> None:
         """Update SongList and emit notifications after a scan."""
