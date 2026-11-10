@@ -73,12 +73,12 @@ class TestListAndBackupNow:
         assert len(body["backups"]) == 1
         assert body["path"] == manager.backup_dir
 
-    def test_backup_now_writes_a_file_and_downloads_it(self, client, manager):
+    def test_backup_now_writes_a_server_file(self, client, manager):
         resp = client.post("/api/backups")
         assert resp.status_code == 200
-        assert "attachment" in resp.headers["Content-Disposition"]
-        dump = json.loads(resp.data)
-        assert dump["schema_version"]
+        body = resp.get_json()
+        assert body["success"] is True
+        assert body["name"].endswith(".json")
         assert _backup_count(manager) == 1
 
 

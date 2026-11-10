@@ -306,6 +306,8 @@
 				var a = document.createElement("a");
 				a.href = url;
 				a.download = filename;
+				// Keep the SPA's global anchor handler from navigating to the blob URL.
+				a.className = "no-spa";
 				document.body.appendChild(a);
 				a.click();
 				a.remove();
@@ -322,48 +324,44 @@
 			}
 
 			function renderBackups(backups) {
-				var $list = $("#backups-list").empty();
-				if (!backups.length) {
-					// {# MSG: Shown in the backups list when there are no backups yet. #}
-					$list.append($("<p class='has-text-grey-light'>").text({{ _('No backups yet.') | tojson }}));
-					return;
+				var $select = $("#backup-select").empty();
+				var has = backups.length > 0;
+				if (!has) {
+					// {# MSG: Placeholder in the backups dropdown when there are none yet. #}
+					$select.append($("<option>").text({{ _('No backups yet') | tojson }}));
+				} else {
+					backups.forEach(function(b) {
+						var when = b.created_at ? new Date(b.created_at).toLocaleString() : b.name;
+						// {# MSG: Count of songs appended to a backup's label, e.g. "42 songs". #}
+						var label = when + (b.song_count != null ? " (" + b.song_count + " " + {{ _('songs') | tojson }} + ")" : "");
+						$select.append($("<option>").attr("value", b.name).text(label));
+					});
 				}
-				backups.forEach(function(b) {
-					var when = b.created_at ? new Date(b.created_at).toLocaleString() : b.name;
-					var $row = $("<div class='is-flex is-justify-content-space-between is-align-items-center py-1'>");
-					var $meta = $("<span>").append($("<strong>").text(when));
-					if (b.song_count != null) {
-						// {# MSG: Count of songs in a backup row, e.g. "42 songs". #}
-						$meta.append($("<span class='has-text-grey-light ml-2'>").text(b.song_count + " " + {{ _('songs') | tojson }}));
-					}
-					var $actions = $("<span class='buttons are-small is-flex-shrink-0 ml-2 mb-0'>");
-					$actions.append(
-						$("<button class='button is-small is-danger is-outlined mb-0 backup-restore-btn'>").text({{ _('Restore') | tojson }}).attr("data-name", b.name),
-						$("<button class='button is-small mb-0 backup-download-btn'>").text({{ _('Download') | tojson }}).attr("data-name", b.name)
-					);
-					$list.append($row.append($meta, $actions));
-				});
+				$select.prop("disabled", !has);
+				$("#backup-restore-btn, #backup-download-btn").prop("disabled", !has);
 			}
 
 			$("#backup-now-btn").click(function() {
 				var $btn = $(this).addClass("is-loading").prop("disabled", true);
-				fetch(backupNowUrl, { method: "POST" }).then(function(r) {
-					if (!r.ok) throw new Error();
-					return r.blob().then(function(blob) { saveBlob(blob, filenameFrom(r, "pikaraoke-backup.json")); });
-				}).then(function() {
-					// {# MSG: Notification after a backup is written and downloaded. #}
-					showNotification({{ _('Backup saved and downloaded') | tojson }}, "is-success");
-					loadBackups();
-				}).catch(function() {
-					// {# MSG: Notification when writing a backup failed. #}
+				$.post(backupNowUrl).done(function(data) {
+					if (data && data.success) {
+						// {# MSG: Notification after a backup is written. #}
+						showNotification({{ _('Backup saved') | tojson }}, "is-success");
+						loadBackups();
+					} else {
+						// {# MSG: Notification when writing a backup failed. #}
+						showNotification({{ _('Backup failed') | tojson }}, "is-danger");
+					}
+				}).fail(function() {
 					showNotification({{ _('Backup failed') | tojson }}, "is-danger");
-				}).finally(function() {
+				}).always(function() {
 					$btn.removeClass("is-loading").prop("disabled", false);
 				});
 			});
 
-			$("#backups-list").on("click", ".backup-download-btn", function() {
-				var name = $(this).attr("data-name");
+			$("#backup-download-btn").click(function() {
+				var name = $("#backup-select").val();
+				if (!name) return;
 				fetch(downloadUrl(name), { method: "POST" }).then(function(r) {
 					if (!r.ok) throw new Error();
 					return r.blob().then(function(blob) { saveBlob(blob, filenameFrom(r, name)); });
@@ -392,8 +390,9 @@
 				});
 			}
 
-			$("#backups-list").on("click", ".backup-restore-btn", function() {
-				var name = $(this).attr("data-name");
+			$("#backup-restore-btn").click(function() {
+				var name = $("#backup-select").val();
+				if (!name) return;
 				confirmAction({
 					// {# MSG: Title of the confirm dialog before restoring a backup. #}
 					title: {{ _('Restore this backup?') | tojson }},
@@ -860,10 +859,16 @@
 					{# MSG: Button that writes a database backup and downloads it. #}
 					<button id="backup-now-btn" class="button is-primary is-flex-shrink-0 ml-4">{% trans %}Back up now{% endtrans %}</button>
 				</div>
-				<div class="panel-block px-5 py-3">
-					{# Filled by JS from /api/backups/list: one row per server backup, each
-					   with Restore and Download. #}
-					<div id="backups-list" class="is-flex-grow-1 is-size-7"></div>
+				<div class="panel-block px-5 py-3 is-justify-content-space-between">
+					{# Populated by JS from /api/backups/list, newest first. Restore and
+					   Download act on the selected backup. #}
+					<div class="select is-flex-grow-1 mr-3">
+						<select id="backup-select" class="is-fullwidth"></select>
+					</div>
+					<span class="buttons is-flex-shrink-0 mb-0">
+						<button id="backup-restore-btn" class="button is-danger is-outlined mb-0" disabled>{% trans %}Restore{% endtrans %}</button>
+						<button id="backup-download-btn" class="button mb-0" disabled>{% trans %}Download{% endtrans %}</button>
+					</span>
 				</div>
 				<div class="panel-block px-5 py-3 is-justify-content-space-between">
 					<span>

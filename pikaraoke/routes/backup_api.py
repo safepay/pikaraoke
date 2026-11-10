@@ -66,12 +66,10 @@ def list_backups():
 
 @backup_api_bp.route("/api/backups", methods=["POST"])
 def backup_now():
-    """Write a server-side backup and hand the same dump straight to the browser."""
+    """Write a server-side backup. Download is the separate, explicit action."""
     k = get_karaoke_instance()
     path = k.backup_manager.create_backup()
-    name = os.path.basename(path)
-    with open(path, encoding="utf-8") as f:
-        return _attachment(f.read(), name)
+    return jsonify({"success": True, "name": os.path.basename(path)})
 
 
 @backup_api_bp.route("/api/backups/<name>/download", methods=["POST"])
