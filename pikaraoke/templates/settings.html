@@ -889,10 +889,8 @@
 				</div>
 				<div class="panel-block px-5 py-3 is-justify-content-space-between">
 					<span>
-						{# MSG: Label for the read-only backup directory path. #}
+						{# MSG: Label for the read-only backup directory path, set at launch with --backup-path. #}
 						{% trans %}Backup location{% endtrans %}
-						{# MSG: Help text noting the backup location is set at launch. #}
-						<span class="is-block is-size-7 has-text-grey-light">{% trans %}Set at launch with --backup-path. Point it at a USB drive or network share to keep backups off this machine.{% endtrans %}</span>
 					</span>
 					<span class="is-family-monospace is-size-7 has-text-grey ml-4" style="word-break: break-all;">{{ backup_path }}</span>
 				</div>
