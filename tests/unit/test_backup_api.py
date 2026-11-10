@@ -81,6 +81,13 @@ class TestListAndBackupNow:
         assert body["name"].endswith(".json")
         assert _backup_count(manager) == 1
 
+    def test_backup_now_skips_when_unchanged(self, client, manager):
+        client.post("/api/backups")
+        body = client.post("/api/backups").get_json()
+        assert body["success"] is True
+        assert body["unchanged"] is True
+        assert _backup_count(manager) == 1
+
 
 class TestDownload:
     def test_downloads_an_existing_backup(self, client, manager):

@@ -41,23 +41,31 @@ class BackupManager:
         """Write a dump of the durable tables now; return its path."""
         return self._write(db_backup.build_dump(self._db))
 
-    def startup_backup(self) -> str | None:
-        """Back up at startup, skipping when the database is unchanged.
+    def backup_if_changed(self) -> str | None:
+        """Write a dump now, skipping when the database is unchanged; return its
+        path, or None when nothing was written.
 
-        A run of restarts with nothing played must not fill the retention pool
-        with identical files and evict the older, more varied states.
+        A run of restarts with nothing played, or a repeated manual press, must
+        not fill the retention pool with identical files and evict the older,
+        more varied states.
         """
         dump = db_backup.build_dump(self._db)
-        existing = self._backup_paths()
-        if existing:
-            try:
-                newest = db_backup.load_dump(_read(existing[0]))
-                if db_backup.dump_fingerprint(newest) == db_backup.dump_fingerprint(dump):
-                    logging.info("Startup backup skipped: database unchanged since last backup")
-                    return None
-            except (OSError, ValueError) as e:
-                logging.warning(f"Could not read newest backup to compare: {e}")
+        if self._unchanged_since_last_backup(dump):
+            logging.info("Backup skipped: database unchanged since last backup")
+            return None
         return self._write(dump)
+
+    def _unchanged_since_last_backup(self, dump: dict[str, Any]) -> bool:
+        """Whether the newest backup holds the same rows as this dump."""
+        existing = self._backup_paths()
+        if not existing:
+            return False
+        try:
+            newest = db_backup.load_dump(_read(existing[0]))
+        except (OSError, ValueError) as e:
+            logging.warning(f"Could not read newest backup to compare: {e}")
+            return False
+        return db_backup.dump_fingerprint(newest) == db_backup.dump_fingerprint(dump)
 
     def list_backups(self) -> list[dict[str, Any]]:
         """Describe the backups newest first: name, time, counts and size."""

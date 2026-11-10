@@ -344,7 +344,10 @@
 			$("#backup-now-btn").click(function() {
 				var $btn = $(this).addClass("is-loading").prop("disabled", true);
 				$.post(backupNowUrl).done(function(data) {
-					if (data && data.success) {
+					if (data && data.success && data.unchanged) {
+						// {# MSG: Notification when Back up now writes nothing because the database is unchanged. #}
+						showNotification({{ _('No backup needed: nothing has changed since the last one') | tojson }}, "is-warning");
+					} else if (data && data.success) {
 						// {# MSG: Notification after a backup is written. #}
 						showNotification({{ _('Backup saved') | tojson }}, "is-success");
 						loadBackups();

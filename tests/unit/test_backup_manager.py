@@ -56,22 +56,22 @@ class TestCreateBackup:
         assert len(os.listdir(backup_dir)) == 2
 
 
-class TestStartupBackup:
+class TestBackupIfChanged:
     def test_writes_on_first_run(self, db, backup_dir):
-        assert _manager(db, backup_dir).startup_backup() is not None
+        assert _manager(db, backup_dir).backup_if_changed() is not None
         assert len(os.listdir(backup_dir)) == 1
 
     def test_skips_when_unchanged(self, db, backup_dir):
         mgr = _manager(db, backup_dir)
-        mgr.startup_backup()
-        assert mgr.startup_backup() is None
+        mgr.backup_if_changed()
+        assert mgr.backup_if_changed() is None
         assert len(os.listdir(backup_dir)) == 1
 
     def test_writes_again_after_a_change(self, db, backup_dir):
         mgr = _manager(db, backup_dir)
-        mgr.startup_backup()
+        mgr.backup_if_changed()
         db.execute("INSERT INTO sessions (uuid, name) VALUES ('s', 'S')")
-        assert mgr.startup_backup() is not None
+        assert mgr.backup_if_changed() is not None
         assert len(os.listdir(backup_dir)) == 2
 
 

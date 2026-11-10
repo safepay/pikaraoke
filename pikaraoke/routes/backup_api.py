@@ -66,9 +66,19 @@ def list_backups():
 
 @backup_api_bp.route("/api/backups", methods=["POST"])
 def backup_now():
-    """Write a server-side backup. Download is the separate, explicit action."""
+    """Write a server-side backup unless the database is unchanged since the last.
+
+    Skipping the write keeps the retention pool from filling with identical
+    files, the same way the startup backup does. Download is the separate action.
+    """
     k = get_karaoke_instance()
-    path = k.backup_manager.create_backup()
+    try:
+        path = k.backup_manager.backup_if_changed()
+    except (OSError, ValueError) as e:
+        logging.error(f"Backup failed: {e}")
+        return jsonify({"success": False, "error": _("Backup failed")}), 500
+    if path is None:
+        return jsonify({"success": True, "unchanged": True})
     return jsonify({"success": True, "name": os.path.basename(path)})
 
 

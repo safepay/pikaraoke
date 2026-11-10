@@ -370,7 +370,7 @@ class Karaoke:
     def _startup_backup(self) -> None:
         """Write a pre-session backup, never letting a failure block boot."""
         try:
-            path = self.backup_manager.startup_backup()
+            path = self.backup_manager.backup_if_changed()
             if path:
                 logging.info(f"Startup database backup: {path}")
         except (OSError, ValueError) as e:
