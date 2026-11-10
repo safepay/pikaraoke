@@ -365,23 +365,7 @@
 	#singer-action-bar {
 		border-bottom: 1px solid var(--bulma-border);
 	}
-	/* On a phone the action buttons collapse to their icons, freeing the row for
-	   a third action; each button's title carries the name the hidden label would,
-	   as the navbar does at its own width. */
-	@media screen and (max-width: 600px) {
-		#singer-action-bar .button > span:not(.icon) {
-			display: none;
-		}
-		/* Icon-only, so square: fixed width matching the is-small height. */
-		#singer-action-bar .button {
-			width: 2.5em;
-			height: 2.5em;
-			padding: 0;
-		}
-		#singer-action-bar .button .icon:first-child:not(:last-child) {
-			margin-inline: 0;
-		}
-	}
+	/* The buttons collapse to their icons on a phone via the shared collapse-to-icon class. */
 	/* The checkbox, avatar and name open each row as one evenly spaced group:
 	   equal facing padding on each boundary, the avatar centred in its own
 	   column rather than left-aligned against the checkbox. The select header
@@ -454,7 +438,7 @@
 
 {% block content %}
 
-<div id="singer-action-bar" class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-2 pb-3 mb-4">
+<div id="singer-action-bar" class="collapse-to-icon is-flex is-flex-wrap-wrap is-align-items-center is-gap-2 pb-3 mb-4">
 	{# Off by default, like Hide skipped on the play log: tombstones show, muted,
 	   until the operator clears them out and hides the rest. #}
 	<label class="checkbox is-size-7 is-inline-flex is-align-items-center is-gap-0.5 has-text-grey-light">
