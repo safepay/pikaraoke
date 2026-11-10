@@ -851,12 +851,9 @@
 					<h4 class="title is-6 m-0">{% trans %}Backup &amp; restore{% endtrans %}</h4>
 				</div>
 				<div class="panel-block px-5 py-3 is-justify-content-space-between">
-					<span>
-						{# MSG: Help text under the Backup Now button. #}
-						{% trans %}Save the metadata, play history and singers that the song files cannot rebuild.{% endtrans %}
-						<span class="is-block is-size-7 has-text-grey-light">{% trans %}Writes a backup on the server and downloads a copy to this device.{% endtrans %}</span>
-					</span>
-					{# MSG: Button that writes a database backup and downloads it. #}
+					{# MSG: Help text beside the Back up now button. #}
+					<span>{% trans %}Saves the metadata, singers and play history the song files cannot rebuild.{% endtrans %}</span>
+					{# MSG: Button that writes a database backup. #}
 					<button id="backup-now-btn" class="button is-primary is-flex-shrink-0 ml-4">{% trans %}Back up now{% endtrans %}</button>
 				</div>
 				<div class="panel-block px-5 py-3 is-justify-content-space-between">
