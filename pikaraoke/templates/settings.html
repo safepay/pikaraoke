@@ -298,8 +298,10 @@
 			var resetDbUrl = {{ url_for('backup_api.reset_database') | tojson }};
 			var restoreTmpl = {{ url_for('backup_api.restore_backup', name='__NAME__') | tojson }};
 			var downloadTmpl = {{ url_for('backup_api.download_backup', name='__NAME__') | tojson }};
+			var deleteTmpl = {{ url_for('backup_api.delete_backup', name='__NAME__') | tojson }};
 			function restoreUrl(name) { return restoreTmpl.replace("__NAME__", encodeURIComponent(name)); }
 			function downloadUrl(name) { return downloadTmpl.replace("__NAME__", encodeURIComponent(name)); }
+			function deleteUrl(name) { return deleteTmpl.replace("__NAME__", encodeURIComponent(name)); }
 
 			function saveBlob(blob, filename) {
 				var url = URL.createObjectURL(blob);
@@ -338,7 +340,7 @@
 					});
 				}
 				$select.prop("disabled", !has);
-				$("#backup-restore-btn, #backup-download-btn").prop("disabled", !has);
+				$("#backup-restore-btn, #backup-download-btn, #backup-delete-btn").prop("disabled", !has);
 			}
 
 			$("#backup-now-btn").click(function() {
@@ -407,6 +409,34 @@
 					confirmLabel: {{ _('Restore') | tojson }},
 					danger: true
 				}).done(function() { runRestore(restoreUrl(name), null); });
+			});
+
+			$("#backup-delete-btn").click(function() {
+				var name = $("#backup-select").val();
+				if (!name) return;
+				confirmAction({
+					// {# MSG: Title of the confirm dialog before deleting one saved backup. #}
+					title: {{ _('Delete this backup?') | tojson }},
+					// {# MSG: Body of the delete-backup confirm dialog. #}
+					message: {{ _('This saved backup is removed. Your other backups and the current database are untouched.') | tojson }},
+					// {# MSG: Irreversibility line in the delete-backup confirm dialog. #}
+					warning: {{ _('The backup file is permanently deleted.') | tojson }},
+					// {# MSG: Confirm button label in the delete-backup dialog. #}
+					confirmLabel: {{ _('Delete') | tojson }},
+					danger: true
+				}).done(function() {
+					$.post(deleteUrl(name)).done(function(data) {
+						if (data && data.success) {
+							// {# MSG: Notification after a saved backup is deleted. #}
+							showNotification({{ _('Backup deleted') | tojson }}, "is-success");
+							loadBackups();
+						} else {
+							showNotification((data && data.error) || {{ _('Could not delete the backup') | tojson }}, "is-danger");
+						}
+					}).fail(function(xhr) {
+						showNotification((xhr.responseJSON && xhr.responseJSON.error) || {{ _('Could not delete the backup') | tojson }}, "is-danger");
+					});
+				});
 			});
 
 			$("#backup-upload-btn").click(function() {
@@ -844,13 +874,13 @@
 						<span class="is-block is-size-7 has-text-grey-light">{% trans %}Reconciles the library with the song directory in the background.{% endtrans %}</span>
 					</span>
 					{# MSG: Button to trigger a background library scan. #}
-					<button id="sync-library-btn" class="button is-primary is-flex-shrink-0 ml-4">{% trans %}Sync Now{% endtrans %}</button>
+					<button id="sync-library-btn" class="button is-primary is-flex-shrink-0 ml-4"><span class="icon"><i class="ph ph-arrows-clockwise"></i></span><span>{% trans %}Sync Now{% endtrans %}</span></button>
 				</div>
 				<div class="panel-block px-5 py-3 is-justify-content-space-between">
 					{# MSG: Help text beside the Back up now button. #}
 					<span>{% trans %}Saves the metadata, singers and play history the song files cannot rebuild.{% endtrans %}</span>
 					{# MSG: Button that writes a database backup. #}
-					<button id="backup-now-btn" class="button is-primary is-flex-shrink-0 ml-4">{% trans %}Back up now{% endtrans %}</button>
+					<button id="backup-now-btn" class="button is-primary is-flex-shrink-0 ml-4"><span class="icon"><i class="ph ph-floppy-disk"></i></span><span>{% trans %}Back up now{% endtrans %}</span></button>
 				</div>
 				<div class="panel-block px-5 py-3 is-justify-content-space-between">
 					{# Populated by JS from /api/backups/list, newest first. Restore and
@@ -858,9 +888,10 @@
 					<div class="select is-fullwidth is-flex-grow-1 mr-3">
 						<select id="backup-select"></select>
 					</div>
-					<span class="buttons is-flex-shrink-0 mb-0">
-						<button id="backup-restore-btn" class="button is-danger is-outlined mb-0" disabled>{% trans %}Restore{% endtrans %}</button>
-						<button id="backup-download-btn" class="button mb-0" disabled>{% trans %}Download{% endtrans %}</button>
+					<span class="buttons collapse-to-icon is-flex-shrink-0 mb-0">
+						<button id="backup-restore-btn" class="button is-danger is-outlined mb-0" title="{% trans %}Restore{% endtrans %}" disabled><span class="icon"><i class="ph ph-clock-counter-clockwise"></i></span><span>{% trans %}Restore{% endtrans %}</span></button>
+						<button id="backup-download-btn" class="button mb-0" title="{% trans %}Download{% endtrans %}" disabled><span class="icon"><i class="ph ph-download-simple"></i></span><span>{% trans %}Download{% endtrans %}</span></button>
+						<button id="backup-delete-btn" class="button is-danger is-outlined mb-0" title="{% trans %}Delete{% endtrans %}" disabled><span class="icon"><i class="ph ph-trash"></i></span><span>{% trans %}Delete{% endtrans %}</span></button>
 					</span>
 				</div>
 				<div class="panel-block px-5 py-3 is-justify-content-space-between">
@@ -870,7 +901,7 @@
 					</span>
 					<input id="backup-upload-input" type="file" accept="application/json,.json" class="is-hidden">
 					{# MSG: Button that opens a file picker to restore from an uploaded backup. #}
-					<button id="backup-upload-btn" class="button is-flex-shrink-0 ml-4">{% trans %}Upload a backup{% endtrans %}</button>
+					<button id="backup-upload-btn" class="button is-flex-shrink-0 ml-4"><span class="icon"><i class="ph ph-upload-simple"></i></span><span>{% trans %}Upload a backup{% endtrans %}</span></button>
 				</div>
 				<label class="panel-block px-5 py-3 is-justify-content-space-between">
 					<span>{# MSG: Switch label to write a backup each time the server starts. #} {% trans %}Back up when the server starts{% endtrans %}</span>

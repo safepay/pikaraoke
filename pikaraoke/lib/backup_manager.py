@@ -100,6 +100,10 @@ class BackupManager:
             raise ValueError(f"Not a backup filename: {name!r}")
         return os.path.join(self._backup_dir, name)
 
+    def delete_backup(self, name: str) -> None:
+        """Delete one named backup, rejecting any path outside the dir."""
+        os.remove(self.path_for(name))
+
     def prune(self) -> None:
         """Keep the newest N backups, delete the rest."""
         keep = max(1, int(self._get_keep_count()))

@@ -107,6 +107,22 @@ class TestDownload:
         assert resp.status_code == 400
 
 
+class TestDelete:
+    def test_deletes_an_existing_backup(self, client, manager):
+        name = os.path.basename(manager.create_backup())
+        resp = client.post(f"/api/backups/{name}/delete")
+        assert resp.status_code == 200 and resp.get_json()["success"] is True
+        assert _backup_count(manager) == 0
+
+    def test_missing_backup_is_404(self, client):
+        resp = client.post("/api/backups/pikaraoke-backup-20260101-120000.json/delete")
+        assert resp.status_code == 404
+
+    def test_invalid_name_is_400(self, client):
+        resp = client.post("/api/backups/evil.json/delete")
+        assert resp.status_code == 400
+
+
 class TestRestore:
     def test_restore_from_server_backup_backs_up_first(self, client, karaoke, manager, db):
         path = manager.create_backup()

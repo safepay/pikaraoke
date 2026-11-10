@@ -96,6 +96,24 @@ def download_backup(name):
         return _attachment(f.read(), name)
 
 
+@backup_api_bp.route("/api/backups/<name>/delete", methods=["POST"])
+def delete_backup(name):
+    """Delete one server-side backup, leaving the database and the rest untouched."""
+    k = get_karaoke_instance()
+    try:
+        path = k.backup_manager.path_for(name)
+    except ValueError:
+        return jsonify({"success": False, "error": _("Invalid backup name")}), 400
+    if not os.path.isfile(path):
+        return jsonify({"success": False, "error": _("Backup not found")}), 404
+    try:
+        k.backup_manager.delete_backup(name)
+    except OSError as e:
+        logging.error(f"Could not delete backup {name}: {e}")
+        return jsonify({"success": False, "error": _("Could not delete the backup")}), 500
+    return jsonify({"success": True})
+
+
 @backup_api_bp.route("/api/backups/<name>/restore", methods=["POST"])
 def restore_backup(name):
     """Restore the database from a server-side backup, then resync."""

@@ -134,3 +134,15 @@ class TestPathSafety:
         path = mgr.create_backup()
         dump = mgr.read_backup(os.path.basename(path))
         assert dump["schema_version"] == db.schema_version
+
+
+class TestDeleteBackup:
+    def test_removes_the_named_file_only(self, backup_dir, db):
+        _touch(backup_dir, "pikaraoke-backup-20260101-120000.json")
+        _touch(backup_dir, "pikaraoke-backup-20260102-120000.json")
+        _manager(db, backup_dir).delete_backup("pikaraoke-backup-20260101-120000.json")
+        assert os.listdir(backup_dir) == ["pikaraoke-backup-20260102-120000.json"]
+
+    def test_rejects_a_foreign_name(self, db, backup_dir):
+        with pytest.raises(ValueError):
+            _manager(db, backup_dir).delete_backup("../secret.json")

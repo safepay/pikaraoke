@@ -885,3 +885,20 @@ td {
   font-variant-numeric: tabular-nums;
   gap: 12px;
 }
+
+/* Collapse a toolbar's buttons to their icons on a phone. The margin reset is
+   load-bearing: a hidden label leaves the icon :not(:last-child), so Bulma keeps
+   its trailing margin as a gap. */
+@media screen and (max-width: 768px) {
+  .collapse-to-icon .button > :not(.icon) {
+    display: none;
+  }
+  .collapse-to-icon .button {
+    width: 2.5em;
+    height: 2.5em;
+    padding: 0;
+  }
+  .collapse-to-icon .button .icon:first-child:not(:last-child) {
+    margin-inline: 0;
+  }
+}
