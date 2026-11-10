@@ -862,8 +862,8 @@
 				<div class="panel-block px-5 py-3 is-justify-content-space-between">
 					{# Populated by JS from /api/backups/list, newest first. Restore and
 					   Download act on the selected backup. #}
-					<div class="select is-flex-grow-1 mr-3">
-						<select id="backup-select" class="is-fullwidth"></select>
+					<div class="select is-fullwidth is-flex-grow-1 mr-3">
+						<select id="backup-select"></select>
 					</div>
 					<span class="buttons is-flex-shrink-0 mb-0">
 						<button id="backup-restore-btn" class="button is-danger is-outlined mb-0" disabled>{% trans %}Restore{% endtrans %}</button>
