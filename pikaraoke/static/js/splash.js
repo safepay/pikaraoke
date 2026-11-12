@@ -403,6 +403,10 @@ const handleNowPlayingUpdate = (np) => {
 
   const video = getVideoPlayer();
 
+  // CDG is pixel-art at native 300x216; nearest-neighbor it to the screen so it
+  // stays crisp. Toggled per song: photographic video must keep smooth scaling.
+  $(video).toggleClass("is-pixelated", !!np.is_cdg);
+
   updateSubtitles(np.now_playing_subtitle_url, video);
 
   if (np.now_playing_url && np.now_playing_url !== currentVideoUrl) {

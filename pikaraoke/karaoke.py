@@ -117,7 +117,6 @@ class Karaoke:
         bg_music_volume: float | None = None,
         browse_results_per_page: int | None = None,
         buffer_size: int | None = None,
-        cdg_pixel_scaling: bool | None = None,
         complete_transcode_before_play: bool | None = None,
         disable_bg_music: bool | None = None,
         disable_bg_video: bool | None = None,
@@ -178,7 +177,6 @@ class Karaoke:
             enable_fair_queue: Order the queue round-robin so singers take turns.
             avsync: Audio/video sync adjustment in seconds.
             config_file_path: Path to config.ini file.
-            cdg_pixel_scaling: Enable CDG pixel scaling.
             streaming_format: Video streaming format ('hls' or 'mp4').
             browse_results_per_page: Number of search results per page.
             additional_ytdl_args: Additional yt-dlp command arguments.

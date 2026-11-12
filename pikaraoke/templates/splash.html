@@ -278,6 +278,12 @@
     width: 100%;
     object-fit: contain;
   }
+  /* CDG only: nearest-neighbor the 300x216 frame up to the screen so the pixel
+     art stays hard-edged. Toggled per song from the now-playing handler; the
+     open question is whether the Pi kiosk honours this on a <video> element. */
+  video.is-pixelated {
+    image-rendering: pixelated;
+  }
   .fw-fh-container {
     height: 100vh;
     width: 100vw;

@@ -280,7 +280,6 @@ def test_preference_manager_defaults_exist():
         "autoplay",
         "limit_user_songs_by",
         "enable_fair_queue",
-        "cdg_pixel_scaling",
         "avsync",
         "browse_results_per_page",
         "low_score_phrases",
@@ -316,7 +315,6 @@ def test_preference_manager_defaults_types():
     assert isinstance(defaults["disable_bg_video"], bool)
     assert isinstance(defaults["disable_score"], bool)
     assert isinstance(defaults["enable_fair_queue"], bool)
-    assert isinstance(defaults["cdg_pixel_scaling"], bool)
     # Autoplay is the one playback toggle that defaults on.
     assert defaults["autoplay"] is True
 

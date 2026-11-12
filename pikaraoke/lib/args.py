@@ -363,7 +363,7 @@ def parse_pikaraoke_args() -> argparse.Namespace:
     )
     playback.add_argument(
         "--cdg-pixel-scaling",
-        help="Enable CDG pixel scaling to improve video rendering of CDG files. This may increase CPU usage and may cause performance issues on slower devices.",
+        help="Deprecated and ignored: CDG files now render crisp on the client by default. Accepted for backward compatibility but has no effect.",
         action="store_true",
         required=False,
     )

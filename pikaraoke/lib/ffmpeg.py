@@ -44,7 +44,6 @@ def build_ffmpeg_cmd(
     force_mp4_encoding: bool = False,
     buffer_fully_before_playback: bool = False,
     avsync: float = 0,
-    cdg_pixel_scaling: bool = False,
 ) -> Any:
     """Build an ffmpeg command for transcoding media.
 
@@ -57,7 +56,6 @@ def build_ffmpeg_cmd(
         normalize_audio: Whether to apply loudness normalization.
         force_mp4_encoding: If True, force mp4 encoding.
         avsync: Audio/video sync adjustment in seconds.
-        cdg_pixel_scaling: Enable pixel scaling for CDG rendering.
 
     Returns:
         ffmpeg stream object ready to execute with run_async().
@@ -127,8 +125,6 @@ def build_ffmpeg_cmd(
         # shorter track rather than playing through, so "ended" never fires (#942).
         # 600s is a ceiling on any outro; -t trims back to the audio length.
         video = video.filter("tpad", stop_mode="clone", stop_duration=600)
-        if cdg_pixel_scaling:
-            video = video.filter("scale", -1, 720, flags="neighbor")
     else:
         video = input.video
 

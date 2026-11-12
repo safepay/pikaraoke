@@ -53,7 +53,6 @@ def settings():
         splash_scale=k.splash_scale,
         splash_delay=k.splash_delay,
         normalize_audio=k.normalize_audio,
-        cdg_pixel_scaling=k.cdg_pixel_scaling,
         high_quality=k.high_quality,
         complete_transcode_before_play=k.complete_transcode_before_play,
         avsync=k.avsync,

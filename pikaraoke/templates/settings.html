@@ -471,13 +471,6 @@
 					</label>
 					<input id="pref-avsync" class="user-preference-input input is-flex-shrink-0 ml-4" type="number" step="0.1" min="-10" max="10" data-pref="avsync" data-start-value="{{ avsync }}" value="{{ avsync }}" />
 				</div>
-				<label class="panel-block px-5 py-3 is-justify-content-space-between">
-					<span>
-						{# MSG: Checkbox label which enable/disables CDG pixel scaling #} {% trans %}Enable CDG pixel scaling{% endtrans %}
-						<span class="is-block is-size-7 has-text-grey-light">{% trans %}Crisper visuals for CDG files, may increase CPU usage.{% endtrans %}</span>
-					</span>
-					<input id="pref-cdg-scaling" type="checkbox" class="user-preference-checkbox switch ml-4 mr-0" data-pref="cdg_pixel_scaling" {% if cdg_pixel_scaling == True %}checked{% endif %}>
-				</label>
 				{% if mic_passthrough_enabled %}
 				<div class="panel-block is-block p-5">
 					{% if mic_available %}

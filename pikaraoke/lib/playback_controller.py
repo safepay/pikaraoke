@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Callable
 from flask_babel import _
 
 from pikaraoke.lib.events import EventSystem
-from pikaraoke.lib.file_resolver import delete_stream_files
+from pikaraoke.lib.file_resolver import delete_stream_files, is_cdg_file
 from pikaraoke.lib.preference_manager import PreferenceManager
 from pikaraoke.lib.stream_manager import PlaybackResult, StreamManager
 
@@ -362,6 +362,9 @@ class PlaybackController:
             "now_playing_duration": self.now_playing_duration,
             "now_playing_transpose": self.now_playing_transpose,
             "now_playing_url": self.now_playing_url,
+            "is_cdg": (
+                is_cdg_file(self.now_playing_filename) if self.now_playing_filename else False
+            ),
             "now_playing_subtitle_url": self.now_playing_subtitle_url,
             "now_playing_position": self.now_playing_position,
             "is_paused": self.is_paused,
