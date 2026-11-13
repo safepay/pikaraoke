@@ -478,9 +478,32 @@ a.navbar-item.is-active {
   height: var(--avatar-size);
   margin-right: 0.125rem;
   vertical-align: middle;
+  /* The disc carries its own contrast; never the page's text outline (splash). */
+  text-shadow: none;
 }
 .singer-avatar > .ph {
   font-size: var(--avatar-size);
+}
+/* An avatar beside a name: flex so the disc centres on the text at any size.
+   The navbar gets this free from .navbar-item's own flex. */
+.singer-line {
+  display: inline-flex;
+  align-items: center;
+}
+/* A named singer's monogram: a hued disc behind their first letter. The hue is
+   the one bespoke colour Bulma's tokens cannot cover. */
+.singer-monogram {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background-color: hsl(var(--singer-hue, 0) 52% 42%);
+  color: #fff;
+  font-weight: 600;
+  font-size: calc(var(--avatar-size) * 0.5);
+  text-transform: uppercase;
 }
 /* A retired (merged) singer: a knocked-out face on a muted disc, meant to read
    as inactive. */
@@ -501,6 +524,20 @@ a.navbar-item.is-active {
 .singer-avatar.is-system > .ph {
   font-size: calc(var(--avatar-size) * 0.6);
   color: var(--bulma-link-invert);
+}
+/* The navbar identity slot is the account anchor, bigger than the bar icons. */
+#current-user .singer-avatar {
+  --avatar-size: 2rem;
+}
+/* Home's now-singing slot is the hero; the up-next singer stays the default. */
+#focus-song .singer-avatar {
+  --avatar-size: 2rem;
+}
+/* On the splash the singer sits in large stroked text: size the disc in em so
+   each line's avatar tracks its own text (now-playing is bigger than up-next). */
+#now-playing .singer-avatar,
+#up-next .singer-avatar {
+  --avatar-size: 1.4em;
 }
 
 /* The box and the first navbar icon share one left inset, so the bar icons line
