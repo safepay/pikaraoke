@@ -382,14 +382,18 @@ const handleNowPlayingUpdate = (np) => {
         `<span class='is-size-6 has-text-success'><b>Key</b>: ${getSemitonesLabel(np.now_playing_transpose)} </span>`
       );
     }
-    $("#now-playing-singer").text(np.now_playing_user);
+    $("#now-playing-singer")
+      .html(window.renderSingerAvatarForName(np.now_playing_user))
+      .append(document.createTextNode(np.now_playing_user == null ? "" : np.now_playing_user));
     $("#now-playing").fadeIn();
   } else {
     $("#now-playing").fadeOut();
   }
   if (np.up_next) {
     $("#up-next-song").text(np.up_next);
-    $("#up-next-singer").text(np.next_user);
+    $("#up-next-singer")
+      .html(window.renderSingerAvatarForName(np.next_user))
+      .append(document.createTextNode(np.next_user == null ? "" : np.next_user));
     $("#up-next").fadeIn();
   } else {
     $("#up-next").fadeOut();

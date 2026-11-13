@@ -41,8 +41,7 @@
       style="margin-bottom: 5px"
     ></p>
     <div class="has-text-success">
-      <span class="icon is-text-size mr-1"><i class="ph ph-microphone-stage" title="Current singer"></i></span>
-      <span id="now-playing-singer"></span>
+      <span id="now-playing-singer" class="singer-line"></span>
       <br />
       <span class="timestamp is-size-6">
         <span id="current">00:00</span>
@@ -95,12 +94,11 @@
       %}Up next:{% endtrans %}
     </b>
     <span id="up-next-song"></span>
-    <div class="has-text-success">
+    <div class="has-text-success is-flex is-align-items-center is-justify-content-flex-end">
       <b class="has-text-white"
         >{# MSG: Label for the next singer in the queue. #}
-        {% trans %}Next singer:{% endtrans %} </b
-      >&nbsp;<span class="icon is-text-size mr-1"><i class="ph ph-microphone-stage" title="Next singer"></i></span
-      ><span id="up-next-singer"></span>
+        {% trans %}Next singer:{% endtrans %}&nbsp;</b
+      ><span id="up-next-singer" class="singer-line"></span>
     </div>
   </div>
 </div>

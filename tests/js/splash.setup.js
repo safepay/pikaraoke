@@ -209,6 +209,9 @@ beforeAll(async () => {
   // Helpers defined inline in base.html, not in any static file.
   window.getSemitonesLabel = (value) => `${value > 0 ? "+" : ""}${value}`;
 
+  // base.html's avatar helper: the real one renders a monogram, the stub a bare slot.
+  window.renderSingerAvatarForName = () => '<span class="singer-avatar"></span>';
+
   // base.html's toast builder: splash.js's flashNotification appends through it,
   // so the splash page has it in production. Mirror it here for the suite.
   window.addToast = ($stack, message, categoryClass, { timeout = 3000, closeable = true } = {}) => {

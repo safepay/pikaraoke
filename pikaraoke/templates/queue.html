@@ -377,7 +377,7 @@
 
     html += '<td>';
     html += '<div class="is-flex is-flex-wrap-wrap is-align-items-baseline">';
-    html += '<span>' + escapeHtml(e.user) + '</span>';
+    html += '<span class="singer-line">' + window.renderSingerAvatarForName(e.user) + '<span>' + escapeHtml(e.user) + '</span></span>';
     html += '<span class="is-hidden-mobile has-text-grey-light mx-2">&bull;</span>';
     html += '<span class="is-hidden-mobile">' + escapeHtml(e.title) + '</span>';
     html += '<span class="is-size-7 is-hidden-tablet" style="width: 100%;">' + escapeHtml(e.title) + '</span>';
