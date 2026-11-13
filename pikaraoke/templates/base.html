@@ -117,7 +117,12 @@
       };
     }
 
-    // Name -> a stable hue (0-359); the fixed saturation and lightness live in the CSS.
+    // The disc's fixed saturation and lightness; only the hue varies per name.
+    // Keep in step with .singer-monogram in custom.css.
+    var MONOGRAM_SATURATION = 0.52;
+    var MONOGRAM_LIGHTNESS = 0.42;
+
+    // Name -> a stable hue (0-359).
     function monogramHue(name) {
       var hash = 0;
       var text = String(name);
@@ -125,6 +130,21 @@
         hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
       }
       return hash % 360;
+    }
+
+    // A white letter fails WCAG on the lighter hues (yellows, greens), so the
+    // ink flips to black past the 0.18 luminance crossover. Keeps every hue at
+    // or above 4.5:1.
+    function monogramHasLightDisc(hue) {
+      var l = MONOGRAM_LIGHTNESS;
+      var a = MONOGRAM_SATURATION * Math.min(l, 1 - l);
+      var channel = function (n) {
+        var k = (n + hue / 30) % 12;
+        var c = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+      };
+      var luminance = 0.2126 * channel(0) + 0.7152 * channel(8) + 0.0722 * channel(4);
+      return luminance >= 0.18;
     }
 
     // One singer avatar for the navbar and the roster, loaded everywhere so the
@@ -143,11 +163,13 @@
           '><i class="ph ph-robot"></i></span>';
       }
       if (opts.name) {
+        var hue = monogramHue(opts.name);
         // Array.from keeps a surrogate-pair first character whole.
         var letter = escapeHtml(Array.from(opts.name)[0] || "?");
+        var ink = monogramHasLightDisc(hue) ? " has-dark-ink" : "";
         return '<span class="singer-avatar"' + title +
-          '><span class="singer-monogram" style="--singer-hue:' +
-          monogramHue(opts.name) + '">' + letter + "</span></span>";
+          '><span class="singer-monogram' + ink + '" aria-hidden="true" style="--singer-hue:' +
+          hue + '">' + letter + "</span></span>";
       }
       return '<span class="singer-avatar"' + title + '><i class="ph ph-user-circle"></i></span>';
     };

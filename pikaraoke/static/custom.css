@@ -505,6 +505,10 @@ a.navbar-item.is-active {
   font-size: calc(var(--avatar-size) * 0.5);
   text-transform: uppercase;
 }
+/* base.html flips to a dark letter where white would fail contrast. */
+.singer-monogram.has-dark-ink {
+  color: #000;
+}
 /* A retired (merged) singer: a knocked-out face on a muted disc, meant to read
    as inactive. */
 .singer-avatar.is-retired {
