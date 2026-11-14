@@ -192,6 +192,9 @@
 	// stream is never inherited by the next singer or across a reload.
 	var watchOpen = false;
 	var watchSongUrl = null;
+	// Whether this phone currently holds a watch slot on the server, so teardown
+	// frees exactly one and a re-render never re-asks for a slot it already has.
+	var watchRegistered = false;
 
 	var waUA = navigator.userAgent;
 	var waIsSafari = /^((?!chrome|android).)*safari/i.test(waUA);
@@ -223,6 +226,10 @@
 		if (watchHls) { watchHls.destroy(); watchHls = null; }
 		var v = watchVideo();
 		if (v) { v.pause(); v.removeAttribute("src"); v.load(); }
+		if (watchRegistered) {
+			watchRegistered = false;
+			if (window.socket) window.socket.emit("unregister_watcher");
+		}
 	}
 
 	// Attach the song's stream, muted, at the live position. ?passive=1 so the
@@ -275,32 +282,35 @@
 		if (open) attachWatch(lastNp); else teardownWatch();
 	}
 
-	// Drives the block whenever the host has enabled phone video and there is a
-	// focus song - one playing, or one cued but not yet started (autoplay off), so
-	// the singer can arm the option before pressing Start. A playing song whose
-	// lyrics are in the picture (HLS, no sidecar subtitle) gets the Watch button;
-	// a sidecar .ass or mp4 stream gets the note instead, until the burn-in stage
-	// lands. A cued song's type is unknown until it starts, so it shows the button
-	// optimistically; attachWatch no-ops until the stream URL arrives, and the
-	// next now_playing re-decides. Nothing in focus hides the whole block.
+	// Ask the room for a slot before showing the video. The grant/deny reply
+	// drives the panel, so a phone past the host's cap gets a note, not a stream.
+	function requestWatch() {
+		if (window.socket) window.socket.emit("register_watcher");
+	}
+
+	// Drives the block whenever the host has enabled phone video and a song is
+	// playing. A playing song whose lyrics are in the picture (HLS, no sidecar
+	// subtitle) gets the Watch button; a sidecar .ass or mp4 stream gets the note
+	// instead, until the burn-in stage lands. Anything but a playing song hides
+	// the whole block, so the button never offers a stream that is not there yet.
 	function renderWatchAlong(np) {
 		var playing = !!(np && np.now_playing && np.now_playing_url);
-		var cued = !!(np && !np.now_playing && np.up_next);
 		// The open flag belongs to the song playing when it was opened; drop it
 		// when a different song takes over so the next singer must tap for it.
 		var songUrl = playing ? np.now_playing_url : null;
 		if (watchSongUrl !== null && songUrl !== watchSongUrl) {
 			watchOpen = false;
+			$("#watch-busy-note").addClass("is-hidden");
 		}
 		watchSongUrl = songUrl;
-		if (!enablePhoneVideo || (!playing && !cued)) {
+		if (!enablePhoneVideo || !playing) {
 			$("#watch-along").addClass("is-hidden");
 			$("#watch-along-panel").addClass("is-hidden");
 			teardownWatch();
 			return;
 		}
 		$("#watch-along").removeClass("is-hidden");
-		if (playing && (!np.now_playing_url.endsWith(".m3u8") || np.now_playing_subtitle_url)) {
+		if (!np.now_playing_url.endsWith(".m3u8") || np.now_playing_subtitle_url) {
 			$("#watch-open").addClass("is-hidden");
 			$("#watch-along-note").removeClass("is-hidden");
 			$("#watch-along-panel").addClass("is-hidden");
@@ -308,9 +318,7 @@
 			return;
 		}
 		$("#watch-along-note").addClass("is-hidden");
-		// The panel can only show a stream, so a cued song shows just the button
-		// until it starts; a tap opens it the moment the song is playing.
-		setWatchOpen(watchOpen && playing);
+		setWatchOpen(watchOpen);
 	}
 
 	// Drift-correct the watch video against the room clock, exactly as a slave
@@ -513,10 +521,7 @@
 		if (wv) {
 			wv.addEventListener("volumechange", function () { if (!wv.muted) wv.muted = true; });
 		}
-		$("#watch-open").on("click", function () {
-			watchOpen = true;
-			setWatchOpen(true);
-		});
+		$("#watch-open").on("click", requestWatch);
 		$("#watch-hide").on("click", function () {
 			watchOpen = false;
 			setWatchOpen(false);
@@ -558,11 +563,30 @@
 		});
 		window.onPageSocket("skip", function () { teardownWatch(); });
 
+		// The server's reply to requestWatch: a slot, or the room is at its cap.
+		window.onPageSocket("watch_granted", function () {
+			watchRegistered = true;
+			watchOpen = true;
+			$("#watch-busy-note").addClass("is-hidden");
+			setWatchOpen(true);
+		});
+		window.onPageSocket("watch_denied", function () {
+			watchOpen = false;
+			$("#watch-busy-note").removeClass("is-hidden");
+		});
+
 		// Enabling or disabling phone video from Settings takes effect here without
 		// a reload, the same way the splash toggles live-update.
 		window.onPageSocket("preferences_update", function (data) {
 			if (data.key !== "enable_phone_video") return;
 			enablePhoneVideo = data.value === true || data.value === "True" || data.value === "true";
+			if (lastNp) renderWatchAlong(lastNp);
+		});
+		// A reset-all broadcasts every default at once, not a single key; pick ours
+		// out so the panel cannot outlive the preference, the way a single toggle
+		// already cannot.
+		window.onPageSocket("preferences_reset", function (defaults) {
+			enablePhoneVideo = defaults.enable_phone_video === true;
 			if (lastNp) renderWatchAlong(lastNp);
 		});
 
@@ -734,6 +758,11 @@
 			<span class="icon is-text-size mr-1"><i class="ph ph-eye"></i></span>
 			{# MSG: Note on the home screen when the playing song can only be watched on the main TV screen, not mirrored to this device. #}
 			<span>{% trans %}This song can only be watched on the main screen.{% endtrans %}</span>
+		</p>
+		<p id="watch-busy-note" class="is-flex is-align-items-center is-size-7 has-text-grey-light is-hidden mt-1">
+			<span class="icon is-text-size mr-1"><i class="ph ph-users"></i></span>
+			{# MSG: Note on the home screen when too many phones are already watching the video, so this one must use the main screen. #}
+			<span>{% trans %}Too many phones are watching - use the main screen.{% endtrans %}</span>
 		</p>
 		<div id="watch-along-panel" class="is-hidden">
 			<video id="watch-video" muted playsinline webkit-playsinline disableRemotePlayback
