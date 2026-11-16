@@ -132,19 +132,42 @@
       return hash % 360;
     }
 
-    // A white letter fails WCAG on the lighter hues (yellows, greens), so the
-    // ink flips to black past the 0.18 luminance crossover. Keeps every hue at
-    // or above 4.5:1.
-    function monogramHasLightDisc(hue) {
-      var l = MONOGRAM_LIGHTNESS;
+    // White ink stays >= 4.5:1 only while the disc's luminance stays at or below
+    // this. (Contrast against white is 1.05 / (L + 0.05), which is 4.5 at 0.183;
+    // 0.17 leaves a little headroom.)
+    var MONOGRAM_MAX_LUMINANCE = 0.17;
+
+    // The disc's relative luminance at a given hue and lightness (fixed
+    // saturation), by the HSL-to-sRGB-to-WCAG path.
+    function monogramLuminance(hue, l) {
       var a = MONOGRAM_SATURATION * Math.min(l, 1 - l);
       var channel = function (n) {
         var k = (n + hue / 30) % 12;
         var c = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
         return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
       };
-      var luminance = 0.2126 * channel(0) + 0.7152 * channel(8) + 0.0722 * channel(4);
-      return luminance >= 0.18;
+      return 0.2126 * channel(0) + 0.7152 * channel(8) + 0.0722 * channel(4);
+    }
+
+    // The lightness to draw a hue at: the base, unless that hue is bright enough
+    // (yellows, greens) that white would fail, in which case it is darkened just
+    // enough to stay within the luminance budget. Keeps one light ink on every
+    // disc instead of flipping the letter dark. Returns a lightness percentage.
+    function monogramLightness(hue) {
+      if (monogramLuminance(hue, MONOGRAM_LIGHTNESS) <= MONOGRAM_MAX_LUMINANCE) {
+        return MONOGRAM_LIGHTNESS * 100;
+      }
+      var lo = 0;
+      var hi = MONOGRAM_LIGHTNESS;
+      for (var i = 0; i < 20; i++) {
+        var mid = (lo + hi) / 2;
+        if (monogramLuminance(hue, mid) > MONOGRAM_MAX_LUMINANCE) {
+          hi = mid;
+        } else {
+          lo = mid;
+        }
+      }
+      return lo * 100;
     }
 
     // One singer avatar for the navbar and the roster, loaded everywhere so the
@@ -166,10 +189,10 @@
         var hue = monogramHue(opts.name);
         // Array.from keeps a surrogate-pair first character whole.
         var letter = escapeHtml(Array.from(opts.name)[0] || "?");
-        var ink = monogramHasLightDisc(hue) ? " has-dark-ink" : "";
+        var light = monogramLightness(hue).toFixed(1);
         return '<span class="singer-avatar"' + title +
-          '><span class="singer-monogram' + ink + '" aria-hidden="true" style="--singer-hue:' +
-          hue + '">' + letter + "</span></span>";
+          '><span class="singer-monogram" aria-hidden="true" style="--singer-hue:' +
+          hue + ';--singer-light:' + light + '%">' + letter + "</span></span>";
       }
       return '<span class="singer-avatar"' + title + '><i class="ph ph-user-circle"></i></span>';
     };

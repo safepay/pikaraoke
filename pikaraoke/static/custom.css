@@ -499,15 +499,11 @@ a.navbar-item.is-active {
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  background-color: hsl(var(--singer-hue, 0) 52% 42%);
+  background-color: hsl(var(--singer-hue, 0) 52% var(--singer-light, 42%));
   color: #fff;
   font-weight: 600;
   font-size: calc(var(--avatar-size) * 0.5);
   text-transform: uppercase;
-}
-/* base.html flips to a dark letter where white would fail contrast. */
-.singer-monogram.has-dark-ink {
-  color: #000;
 }
 /* A retired (merged) singer: a knocked-out face on a muted disc, meant to read
    as inactive. */
