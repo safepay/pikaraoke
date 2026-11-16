@@ -439,12 +439,13 @@ class PlayHistoryManager:
         # early would read the row it was told about in its old state.
         self.events.emit("play_logged")
 
-    def _on_song_ended(self, reason: str | None = None) -> None:
+    def _on_song_ended(self, reason: str | None = None, sung: bool = False) -> None:
         """Close the pending play, recording whether it was sung through.
 
-        end_song() fires on every ending path, so only reason == "complete"
-        marks the song as sung through; "skip" and "timeout" do not. Stamping
-        ended_at is what takes the row out of the "playing right now" state.
+        A natural end (reason "complete") counts as sung, and so does an early
+        end the controller reports as past the sung threshold. An early end short
+        of it does not. Stamping ended_at takes the row out of the "playing right
+        now" state.
         """
         # A transpose or re-cue restart ends the stream but not the performance:
         # hold the row open so the restart reuses it instead of logging a second.
@@ -457,7 +458,7 @@ class PlayHistoryManager:
             return
         self.db.execute(
             "UPDATE plays SET ended_at = CURRENT_TIMESTAMP, completed = ? WHERE id = ?",
-            (1 if reason == "complete" else 0, self._current_play_id),
+            (1 if reason == "complete" or sung else 0, self._current_play_id),
         )
         self._current_play_id = None
         self._current_song_id = None

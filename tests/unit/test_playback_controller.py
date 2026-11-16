@@ -315,7 +315,7 @@ class TestPlaybackControllerEndSong:
 
         # Track emitted events
         emitted_reasons = []
-        events.on("song_ended", lambda reason=None: emitted_reasons.append(reason))
+        events.on("song_ended", lambda reason=None, sung=False: emitted_reasons.append(reason))
 
         pc.end_song(None, PLAYBACK_UID)
 
@@ -339,11 +339,42 @@ class TestPlaybackControllerEndSong:
         pc.stream_manager.kill_ffmpeg = MagicMock()
 
         emitted_reasons = []
-        events.on("song_ended", lambda reason=None: emitted_reasons.append(reason))
+        events.on("song_ended", lambda reason=None, sung=False: emitted_reasons.append(reason))
 
         pc.end_song("complete", PLAYBACK_UID)
 
         assert emitted_reasons == ["complete"]
+
+    @patch("pikaraoke.lib.playback_controller.time.sleep")
+    @patch("pikaraoke.lib.playback_controller.delete_stream_files")
+    @pytest.mark.parametrize(
+        "position, duration, expected_sung",
+        [
+            (180, 200, True),  # 90%, past the 75% threshold
+            (150, 200, True),  # exactly 75%
+            (100, 200, False),  # 50%, short of it
+            (None, 200, False),  # no position report
+            (180, None, False),  # no duration
+        ],
+    )
+    def test_end_song_reports_whether_the_song_was_sung(
+        self, mock_delete, mock_sleep, test_prefs, position, duration, expected_sung
+    ):
+        """A skip past the threshold is sung; short of it, or with no position
+        or duration to judge by, it is not."""
+        events = EventSystem()
+        pc = PlaybackController(test_prefs, events, lambda x, remove_youtube_id=True: x)
+        pc.playback_id = PLAYBACK_UID
+        pc.now_playing_position = position
+        pc.now_playing_duration = duration
+        pc.stream_manager.kill_ffmpeg = MagicMock()
+
+        sung_flags = []
+        events.on("song_ended", lambda reason=None, sung=False: sung_flags.append(sung))
+
+        pc.end_song("skip", PLAYBACK_UID)
+
+        assert sung_flags == [expected_sung]
 
     @patch("pikaraoke.lib.playback_controller.time.sleep")
     @patch("pikaraoke.lib.playback_controller.delete_stream_files")
@@ -480,7 +511,7 @@ class TestPlaybackControllerDeadline:
     ):
         pc = self._playing(test_prefs, mock_monotonic)
         reasons = []
-        pc.events.on("song_ended", lambda reason=None: reasons.append(reason))
+        pc.events.on("song_ended", lambda reason=None, sung=False: reasons.append(reason))
 
         mock_monotonic.return_value = 1000 + self.DURATION + OVERRUN_MARGIN_S - 1
         pc.end_if_overran()
@@ -556,7 +587,7 @@ class TestPlaybackControllerDeadline:
         pc = self._playing(test_prefs, mock_monotonic)
         pc.end_song("complete", PLAYBACK_UID)
         reasons = []
-        pc.events.on("song_ended", lambda reason=None: reasons.append(reason))
+        pc.events.on("song_ended", lambda reason=None, sung=False: reasons.append(reason))
 
         mock_monotonic.return_value = 1_000_000
         pc.end_if_overran()

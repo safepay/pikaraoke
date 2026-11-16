@@ -417,6 +417,18 @@ class TestCompleted:
         events.emit("song_ended", reason)
         assert history.get_plays(include_skipped=True)[0]["completed"] == 0
 
+    def test_completed_when_the_early_end_was_sung(self, history, events, song_id):
+        """A skip past the threshold reaches here as sung, and counts."""
+        history.record_play(song_id, None, "Alice", "A Song")
+        events.emit("song_ended", "skip", True)
+        assert history.get_plays(include_skipped=True)[0]["completed"] == 1
+
+    def test_a_sung_near_end_skip_takes_a_turn(self, history, events, song_id):
+        """So the fair queue stops re-serving a singer who skipped the outro."""
+        history.record_play(song_id, None, "Alice", "A Song")
+        events.emit("song_ended", "skip", True)
+        assert history.get_turns_taken() == {"alice": 1}
+
     def test_song_ended_with_nothing_tracked_is_noop(self, history, events):
         events.emit("song_ended", "complete")
         assert history.get_plays(include_skipped=True) == []

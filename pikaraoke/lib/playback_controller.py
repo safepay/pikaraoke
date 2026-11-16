@@ -31,6 +31,10 @@ START_WATCHDOG_STALL_S = 15
 # test cannot - a blocked-autoplay client, or a tab that loaded but will not play.
 START_WATCHDOG_HARD_S = 45
 
+# A song ended before its final frame still counts as sung past this fraction of its
+# duration: skipping the outro once the singing is done is the karaoke norm.
+SUNG_FRACTION_THRESHOLD = 0.75
+
 
 class PlaybackController:
     """Controller for managing playback state and stream coordination.
@@ -272,6 +276,8 @@ class PlaybackController:
         logging.info(f"Song ending: {self.now_playing}")
         # Read before reset_now_playing clears it; the scoped cleanup below needs it.
         stream_uid = self.playback_id
+        # Decide before reset clears the position.
+        sung = self._reached_sung_threshold()
         # Claim the playback before anything that yields to another greenlet, so
         # a second caller arriving mid-cleanup is rejected by the guard above.
         self.reset_now_playing()
@@ -289,7 +295,16 @@ class PlaybackController:
         delete_stream_files(stream_uid)
         logging.debug("Cleanup complete")
 
-        self.events.emit("song_ended", reason)
+        self.events.emit("song_ended", reason, sung)
+
+    def _reached_sung_threshold(self) -> bool:
+        """True if the song played far enough to count as sung despite an early end.
+
+        No duration or no position report means it does not count.
+        """
+        if not self.now_playing_duration or self.now_playing_position is None:
+            return False
+        return self.now_playing_position / self.now_playing_duration >= SUNG_FRACTION_THRESHOLD
 
     def skip(self, log_action: bool = True, reason: str = "skip") -> bool:
         """Skip the currently playing song.
