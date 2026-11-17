@@ -403,7 +403,7 @@ def parse_pikaraoke_args() -> argparse.Namespace:
     queue.add_argument(
         "--require-singer-password",
         action="store_true",
-        help="Require every singer to set a password on their name before they can queue or favourite. Off by default, where naming yourself is open and a password is an opt-in upgrade.",
+        help="Require every singer to lock their name with a password before queueing a song or saving a favourite. Off by default, where naming yourself is open and a password is an opt-in upgrade.",
         required=False,
     )
 

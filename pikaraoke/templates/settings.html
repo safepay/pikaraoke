@@ -615,10 +615,23 @@
 					</span>
 					<input id="pref-fair-queue" type="checkbox" class="user-preference-checkbox switch ml-4 mr-0" data-pref="enable_fair_queue" {% if enable_fair_queue == True %}checked{% endif %}>
 				</label>
+			</div>
+
+			<hr class="my-0">
+
+			<header class="card-header py-3 px-5 collapsible-header is-collapsed">
+				<div>
+					{# MSG: Header of the settings section for singer names and the password policy. #}
+					<h3 class="m-0">{% trans %}Singers{% endtrans %}</h3>
+					{# MSG: One-line summary under the Singers heading, naming the controls inside it. #}
+					<span class="section-summary is-size-7 has-text-grey-light">{% trans %}Password protection for singer names{% endtrans %}</span>
+				</div>
+			</header>
+			<div class="collapsible-content panel is-shadowless mb-0">
 				<label class="panel-block px-5 py-3 is-justify-content-space-between">
 					<span>
 						{# MSG: Checkbox label for making a singer password mandatory before queueing. #} {% trans %}Require a singer password{% endtrans %}
-						<span class="is-block is-size-7 has-text-grey-light">{% trans %}Everyone must set a password on their name before they can queue or favourite.{% endtrans %}</span>
+						<span class="is-block is-size-7 has-text-grey-light">{% trans %}Everyone must lock their name with a password before queueing a song or saving a favourite.{% endtrans %}</span>
 					</span>
 					<input id="pref-require-singer-password" type="checkbox" class="user-preference-checkbox switch ml-4 mr-0" data-pref="require_singer_password" {% if require_singer_password == True %}checked{% endif %}>
 				</label>
