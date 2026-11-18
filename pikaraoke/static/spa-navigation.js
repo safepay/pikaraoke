@@ -150,6 +150,7 @@
             $modal.find('.text-prompt-cancel, .modal-background').off('.prompt');
             $input.off('.prompt');
             $pw.off('.prompt');
+            $(document).off('keydown.prompt');
         }
         function okDisabled() {
             if (!$input.val().trim()) { return true; }
@@ -198,20 +199,29 @@
             if (e.key === 'Enter') {
                 e.preventDefault();
                 accept();
-            } else if (e.key === 'Escape') {
-                e.preventDefault();
-                dismiss();
             }
         }
         $input.on('keydown.prompt', onKey);
         $pw.on('keydown.prompt', onKey);
+        // On document, so Escape still closes when the dialog opens with no field focused.
+        $(document).on('keydown.prompt', function (e) {
+            if (e.key === 'Escape') { e.preventDefault(); dismiss(); }
+        });
         function refreshOk() { $ok.prop('disabled', okDisabled()); }
         $input.on('input.prompt', refreshOk);
         $pw.on('input.prompt', refreshOk);
 
         refreshOk();
         $modal.addClass('is-active');
-        $input.trigger('focus').trigger('select');
+        // Focus what needs input: the password to log in, a single-value name to
+        // retype, an empty name to join. A filled profile opens neutral.
+        if (pw && pw.required && $input.val().trim()) {
+            $pw.trigger('focus');
+        } else if (opts.selectValue !== false) {
+            $input.trigger('focus').trigger('select');
+        } else if (!$input.val().trim()) {
+            $input.trigger('focus');
+        }
         return d;
     };
 
@@ -326,8 +336,9 @@
             const pw = {
                 label: isOwner ? t.passwordChangeLabel : t.passwordLabel,
                 placeholder: t.passwordPlaceholder,
+                // No help when a password is simply required: the dialog already says so.
                 help: mustLogin ? t.passwordLoginHelp
-                    : mustSet ? t.passwordRequiredHelp
+                    : mustSet ? ''
                     : isOwner ? t.passwordChangeHelp
                     : t.passwordOptionalHelp,
                 required: mustLogin || mustSet,
@@ -335,7 +346,8 @@
                 onSubmit: submitIdentity
             };
             // The name is always required; its asterisk and the password's share one legend.
-            window.promptForText(Object.assign({}, opts, { password: pw, required: true }))
+            // selectValue false: multi-field dialog, so no name preselect.
+            window.promptForText(Object.assign({}, opts, { password: pw, required: true, selectValue: false }))
                 .done(function (res) {
                     d.resolve(typeof res === 'string'
                         ? { name: res, action: 'plain', authed: false }
